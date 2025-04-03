@@ -6,7 +6,6 @@ import driveService from "../services/drive_service";
 import fileService from "../services/file_service";
 import folderService from "../services/folder_service";
 import { getCategoryFromMimeType } from "~/lib/utils";
-import { auth } from "@clerk/nextjs";
 
 export const getFiles = async (folderId: number) => {
   const user = await currentUser();
@@ -158,7 +157,12 @@ export const deleteFile = async (id: number) => {
 
 export const searchFile = async (query: string) => {
   try {
-    const results = await fileService.search(query);
+    const results = await fileService.search({
+      text: query,
+      type: "",
+      name: query,
+      tag: ""
+    });
     return results;
   } catch (error) {
     console.error((error as Error).message);

@@ -44,6 +44,31 @@ export class FileService {
   };
 
   /**
+   * Get files by folder ID
+   * @param folderId ID of the folder to get files from
+   * @returns Array of files in the specified folder
+   */
+  findByFolderId = async (folderId: number) => {
+    try {
+      const files = await db.file.findMany({
+        where: {
+          folder: {
+            id: folderId
+          }
+        },
+        include: {
+          tags: true,
+          folder: true,
+        },
+        orderBy: { createdAt: "desc" },
+      });
+      return files;
+    } catch (error) {
+      throw new Error((error as Error).message);
+    }
+  };
+
+  /**
    * Get files by tag name
    * @param tagName Name of the tag to filter by
    * @returns Array of files with the specified tag
