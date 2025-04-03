@@ -1,0 +1,62 @@
+generator client {
+  provider        = "prisma-client-js"
+  previewFeatures = ["fullTextSearchPostgres"]
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Tag {
+  id        Int      @id @default(autoincrement())
+  name      String   @unique
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  files     File[]   @relation("FileToTag")
+}
+
+model Folder {
+  id          Int      @id @default(autoincrement())
+  title       String
+  googleId    String   @unique
+  userClerkId String
+  description String?
+  isRoot      Boolean  @default(false)
+  parentId    Int?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  isFavorite  Boolean  @default(false)
+  files       File[]
+  parent      Folder?  @relation("FolderToFolder", fields: [parentId], references: [id])
+  children    Folder[] @relation("FolderToFolder")
+}
+
+model File {
+  id               Int      @id @default(autoincrement())
+  folderId         Int
+  userClerkId      String
+  categeory        Category
+  googleId         String   @unique
+  title            String
+  mimeType         String
+  description      String?
+  webViewLink      String
+  webContentLink   String
+  thumbnailLink    String?
+  iconLink         String
+  fileSize         Int
+  fileExtension    String
+  originalFilename String
+  trashed          Boolean? @default(false)
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+  folder           Folder   @relation(fields: [folderId], references: [id], onDelete: Cascade)
+  tags             Tag[]    @relation("FileToTag")
+}
+
+enum Category {
+  IMAGE
+  VIDEO
+  DOCUMENT
+}
