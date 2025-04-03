@@ -109,18 +109,19 @@ const FileUploadForm = ({ folderId }: Props) => {
                   <FormLabel>File</FormLabel>
                   <FormControl>
                     <Dropzone
-                      onDrop={(files) => {
-                        onChange(files[0]);
-                        form.setValue("file", files[0]);
+                      onDrop={(files: File[]) => {
+                        if (files[0]) {
+                          onChange(files[0]);
+                          form.setValue("file", files[0]);
+                        }
                       }}
-                      value={value}
                       {...field}
                     >
-                      {(state: DropzoneState) => (
+                      {(state) => (
                         <div className="flex flex-col items-center justify-center gap-2 rounded-lg border border-dashed p-4">
                           <FileCheck className="size-8 text-muted-foreground" />
                           <p className="text-sm text-muted-foreground">
-                            {state.file ? state.file.name : "Drop a file here"}
+                            {value?.name || "Drop a file here"}
                           </p>
                         </div>
                       )}
