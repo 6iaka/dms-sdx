@@ -5,7 +5,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { FileCheck, Loader2 } from "lucide-react";
 import { useState } from "react";
 import { useForm } from "react-hook-form";
-import Dropzone, { type DropzoneState } from "shadcn-dropzone";
+import Dropzone from "shadcn-dropzone";
 import { z } from "zod";
 import { Button } from "~/components/ui/button";
 import {
@@ -117,7 +117,7 @@ const FileUploadForm = ({ folderId }: Props) => {
                       }}
                       {...field}
                     >
-                      {(state) => (
+                      {() => (
                         <div className="flex flex-col items-center justify-center gap-2 rounded-lg border border-dashed p-4">
                           <FileCheck className="size-8 text-muted-foreground" />
                           <p className="text-sm text-muted-foreground">

@@ -122,7 +122,7 @@ export class FileService {
     tag: string;
   }) => {
     try {
-      let whereClause: Prisma.FileWhereInput = {};
+      const whereClause: Prisma.FileWhereInput = {};
 
       // Text search across title, filename, and description
       if (query.text) {

@@ -1,6 +1,6 @@
 "use client";
 import type { File as FileData, Tag } from "@prisma/client";
-import { EllipsisVertical, Loader2, Trash, Pencil } from "lucide-react";
+import { EllipsisVertical, Trash } from "lucide-react";
 import Image from "next/image";
 import { useState, useTransition } from "react";
 import {

@@ -58,8 +58,7 @@ const TagsSection = () => {
       try {
         const result = await getFilesByTag(selectedTag);
         return result || [];
-      } catch (error) {
-        console.error("Error fetching files:", error);
+      } catch {
         return [];
       }
     },
@@ -90,7 +89,7 @@ const TagsSection = () => {
           variant: "destructive",
         });
       }
-    } catch (error) {
+    } catch {
       toast({
         title: "Error deleting tag",
         variant: "destructive",
@@ -118,7 +117,7 @@ const TagsSection = () => {
           variant: "destructive",
         });
       }
-    } catch (error) {
+    } catch {
       toast({
         title: "Error updating tag",
         variant: "destructive",
@@ -208,7 +207,7 @@ const TagsSection = () => {
           {/* Files Section */}
           {selectedTag && (
             <div className="flex flex-col gap-2">
-              <h3 className="text-balance font-medium">Files with tag "{selectedTag}"</h3>
+              <h3 className="text-balance font-medium">Files with tag &quot;{selectedTag}&quot;</h3>
               <div className="grid w-full grid-cols-[repeat(auto-fill,minmax(9rem,1fr))] gap-2">
                 {isLoading ? (
                   <div className="col-span-full flex justify-center py-8">
@@ -233,7 +232,7 @@ const TagsSection = () => {
           <DialogHeader>
             <DialogTitle>Delete Tag</DialogTitle>
             <DialogDescription>
-              Are you sure you want to delete the tag "{tagToDelete}"? This action cannot be undone.
+              Are you sure you want to delete the tag &quot;{tagToDelete}&quot;? This action cannot be undone.
             </DialogDescription>
           </DialogHeader>
           <DialogFooter>

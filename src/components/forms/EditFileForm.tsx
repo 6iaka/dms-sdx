@@ -2,7 +2,7 @@
 
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { Loader2, X, Pencil } from "lucide-react";
+import { X, Pencil } from "lucide-react";
 import { useState } from "react";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
@@ -125,7 +125,7 @@ const EditFileForm = ({ data }: Props) => {
         <DialogHeader>
           <DialogTitle>Edit File</DialogTitle>
           <DialogDescription>
-            Make changes to your file here. Click save when you're done.
+            Make changes to your file here. Click save when you&apos;re done.
           </DialogDescription>
         </DialogHeader>
         <Form {...form}>

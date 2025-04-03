@@ -1,5 +1,5 @@
 "server only";
-import type { Folder, Prisma } from "@prisma/client";
+import type { Prisma } from "@prisma/client";
 import { db } from "../db";
 
 export class FolderService {

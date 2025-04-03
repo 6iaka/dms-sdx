@@ -1,5 +1,4 @@
 import { notFound } from "next/navigation";
-import type { File, Folder } from "@prisma/client";
 import { findFolderById } from "~/server/actions/folder_action";
 import FolderPageClient from "./FolderPageClient";
 

@@ -80,7 +80,7 @@ const FolderPageClient = ({ data }: { data: FolderWithChildren }) => {
       // Invalidate queries to refresh the data
       await queryClient.invalidateQueries({ queryKey: ["files"] });
       await queryClient.invalidateQueries({ queryKey: ["tags"] });
-    } catch (error) {
+    } catch {
       toast({
         title: "Error",
         description: "Failed to delete files",
@@ -108,7 +108,7 @@ const FolderPageClient = ({ data }: { data: FolderWithChildren }) => {
       setIsSelecting(false);
       await queryClient.invalidateQueries({ queryKey: ["files"] });
       await queryClient.invalidateQueries({ queryKey: ["tags"] });
-    } catch (error) {
+    } catch {
       toast({
         title: "Error",
         description: "Failed to assign tags",
