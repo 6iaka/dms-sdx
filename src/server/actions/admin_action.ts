@@ -67,7 +67,7 @@ export const syncDrive = async () => {
 
             return await fileService.upsert({
               folder: { connect: { googleId: parentFolder } },
-              iconLink: item.iconLink?.replace("16", "64"),
+              iconLink: item.iconLink?.replace("16", "64") || "",
               originalFilename: item.originalFilename!,
               webContentLink: item.webContentLink!,
               fileExtension: item.fileExtension!,
