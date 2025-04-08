@@ -1,7 +1,7 @@
 "use client";
 
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { MoreVertical, Tag, Trash2, Pencil, Loader2 } from "lucide-react";
+import { MoreVertical, Tag as TagIcon, Trash2, Pencil, Loader2 } from "lucide-react";
 import { useState } from "react";
 import { Button } from "~/components/ui/button";
 import {
@@ -27,45 +27,14 @@ import {
 } from "~/components/ui/dropdown-menu";
 import { Input } from "~/components/ui/input";
 import { Label } from "~/components/ui/label";
-import type { Tag } from "@prisma/client";
+import type { File, Tag } from "@prisma/client";
 
-type FileWithTags = {
-  id: number;
-  title: string;
-  mimeType: string;
-  thumbnailLink: string | null;
-  iconLink: string;
-  webViewLink: string;
-  webContentLink: string;
-  fileSize: number;
-  fileExtension: string;
-  originalFilename: string;
-  trashed: boolean | null;
-  createdAt: Date;
-  updatedAt: Date;
-  folderId: number;
-  userClerkId: string;
-  categeory: Tag;
-  googleId: string;
-  description: string | null;
-  tags: {
-    id: number;
-    name: string;
-    createdAt: Date;
-    updatedAt: Date;
-  }[];
-  folder: {
+type FileWithTags = File & {
+  tags: Tag[];
+  folder?: {
     id: number;
     title: string;
-    googleId: string;
-    userClerkId: string;
-    description: string | null;
-    isRoot: boolean;
-    parentId: number | null;
-    createdAt: Date;
-    updatedAt: Date;
-    isFavorite: boolean;
-  };
+  } | null;
 };
 
 const TagsSection = () => {
@@ -193,7 +162,7 @@ const TagsSection = () => {
     <Dialog>
       <DialogTrigger asChild>
         <Button variant="ghost" size="icon" className="rounded-full">
-          <Tag className="h-5 w-5" />
+          <TagIcon className="h-4 w-4" />
         </Button>
       </DialogTrigger>
       <DialogContent className="sm:max-w-[800px]">
