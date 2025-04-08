@@ -4,21 +4,21 @@ import { useRouter } from "next/navigation";
 import { Button } from "./ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "./ui/card";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "./ui/dialog";
-import { EditFileForm } from "./EditFileForm";
 import { Trash2 } from "lucide-react";
 import { deleteFile } from "~/server/actions/file_action";
 import { toast } from "sonner";
 import { EllipsisVertical } from "lucide-react";
 import Image from "next/image";
-import { useState, useTransition } from "react";
+import { useTransition } from "react";
+import { useQueryClient } from "@tanstack/react-query";
+import { cn, formatFileSize } from "~/lib/utils";
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "~/components/ui/dropdown-menu";
-import { cn, formatFileSize } from "~/lib/utils";
-import { useQueryClient } from "@tanstack/react-query";
+import EditFileForm from "./forms/EditFileForm";
 
 type Props = { 
   data: File & {
