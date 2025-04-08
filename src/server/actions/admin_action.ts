@@ -22,25 +22,47 @@ export const syncDrive = async () => {
       (item) => item.mimeType === "application/vnd.google-apps.folder"
     );
     
+    // Create a map to track folder relationships
+    const folderMap = new Map<string, string>();
+    folderItems.forEach(item => {
+      if (item.parents?.[0]) {
+        folderMap.set(item.id!, item.parents[0]);
+      }
+    });
+
+    // Sync folders in order of hierarchy (root first, then children)
+    const syncedFolders = new Set<string>();
+    const syncFolder = async (folderId: string) => {
+      if (syncedFolders.has(folderId)) return;
+      
+      const folder = folderItems.find(item => item.id === folderId);
+      if (!folder) return;
+
+      const parentId = folderMap.get(folderId);
+      if (parentId && !syncedFolders.has(parentId)) {
+        await syncFolder(parentId);
+      }
+
+      try {
+        await folderService.upsert({
+          parent: parentId 
+            ? { connect: { googleId: parentId } }
+            : undefined,
+          description: folder.description,
+          userClerkId: user.id,
+          googleId: folder.id!,
+          title: folder.name!,
+          isRoot: !folder.parents || folder.parents.length === 0,
+        });
+        syncedFolders.add(folderId);
+      } catch (error) {
+        console.error("Error syncing folder:", error);
+      }
+    };
+
+    // Sync all folders
     await Promise.allSettled(
-      folderItems.map((item) =>
-        limit(async () => {
-          try {
-            return await folderService.upsert({
-              parent: item.parents?.[0] 
-                ? { connect: { googleId: item.parents[0] } }
-                : undefined,
-              description: item.description,
-              userClerkId: user.id,
-              googleId: item.id!,
-              title: item.name!,
-              isRoot: !item.parents || item.parents.length === 0,
-            });
-          } catch (error) {
-            console.error("Error syncing folder:", error);
-          }
-        }),
-      ),
+      folderItems.map(item => syncFolder(item.id!))
     );
 
     // Then sync all files

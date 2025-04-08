@@ -7,6 +7,7 @@ import { deleteFolder, toggleFolderFavorite } from "~/server/actions/folder_acti
 import EditFolderForm from "./forms/EditFolderForm";
 import { Button } from "./ui/button";
 import { useToast } from "~/hooks/use-toast";
+import { useRouter } from "next/navigation";
 
 import {
   DropdownMenu,
@@ -19,34 +20,42 @@ import { useTransition } from "react";
 type Props = { data: Folder };
 
 const FolderCard = ({ data }: Props) => {
-  const [isPending, startTransition] = useTransition();
   const { toast } = useToast();
+  const [isPending, startTransition] = useTransition();
+  const router = useRouter();
 
-  const handleToggleFavorite = async (e: Event) => {
-    e.preventDefault();
+  const handleToggleFavorite = async () => {
     startTransition(async () => {
-      try {
-        console.log("Toggling favorite for folder:", data.id);
-        const result = await toggleFolderFavorite(data.id);
-        console.log("Toggle result:", result);
-        
-        if (result?.success) {
-          toast({
-            title: "Success",
-            description: result.message,
-          });
-        } else {
-          toast({
-            title: "Error",
-            description: result?.message || "Failed to update favorite status",
-            variant: "destructive",
-          });
-        }
-      } catch (error) {
-        console.error("Error toggling favorite:", error);
+      const result = await toggleFolderFavorite(data.id);
+      if (result.success) {
+        toast({
+          title: "Success",
+          description: result.message,
+        });
+      } else {
         toast({
           title: "Error",
-          description: "An unexpected error occurred",
+          description: result.message,
+          variant: "destructive",
+        });
+      }
+    });
+  };
+
+  const handleDelete = async () => {
+    startTransition(async () => {
+      const result = await deleteFolder(data.id);
+      if (result.success) {
+        toast({
+          title: "Success",
+          description: result.message,
+        });
+        // Refresh the current page
+        router.refresh();
+      } else {
+        toast({
+          title: "Error",
+          description: result.message,
           variant: "destructive",
         });
       }
@@ -122,11 +131,7 @@ const FolderCard = ({ data }: Props) => {
             </DropdownMenuItem>
 
             <DropdownMenuItem
-              onSelect={() =>
-                startTransition(async () => {
-                  await deleteFolder(data.id);
-                })
-              }
+              onSelect={handleDelete}
               className="flex items-center gap-2"
             >
               <Trash className="h-4 w-4" />

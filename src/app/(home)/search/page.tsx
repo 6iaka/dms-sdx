@@ -8,7 +8,7 @@ type Props = {
     query?: string;
     type?: string;
     name?: string;
-    tag?: string;
+    tag?: string | string[];
   }>;
 };
 

@@ -12,7 +12,6 @@ export class FolderService {
     try {
       const folders = await db.folder.findMany({
         orderBy: { createdAt: "desc" },
-        take: 10,
         where,
       });
       return folders;

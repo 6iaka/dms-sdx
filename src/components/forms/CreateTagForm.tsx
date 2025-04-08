@@ -21,6 +21,7 @@ import {
   PopoverTrigger,
 } from "~/components/ui/popover";
 import { upsertTag } from "~/server/actions/tag_action";
+import { useQueryClient } from "@tanstack/react-query";
 
 const formSchema = z.object({
   name: z.string().trim().toLowerCase(),
@@ -28,6 +29,7 @@ const formSchema = z.object({
 
 const CreateTagForm = () => {
   const [isOpen, setIsOpen] = useState(false);
+  const queryClient = useQueryClient();
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
     defaultValues: { name: "" },
@@ -37,6 +39,7 @@ const CreateTagForm = () => {
     await upsertTag(values.name);
     form.reset();
     setIsOpen(false);
+    await queryClient.invalidateQueries({ queryKey: ["tags"] });
   };
 
   return (

@@ -119,7 +119,7 @@ export class FileService {
     text: string;
     type: string;
     name: string;
-    tag: string;
+    tag: string | string[];
   }) => {
     try {
       const whereClause: Prisma.FileWhereInput = {};
@@ -147,11 +147,14 @@ export class FileService {
         ];
       }
 
-      // Tag filter
+      // Tag filter - handle both single tag and multiple tags
       if (query.tag) {
+        const tags = Array.isArray(query.tag) ? query.tag : [query.tag];
         whereClause.tags = {
-          some: {
-            name: query.tag
+          every: {
+            name: {
+              in: tags
+            }
           }
         };
       }

@@ -73,13 +73,21 @@ const FileCard = ({ data, isSelecting, isSelected, onSelect }: Props) => {
       onDoubleClick={() => (window.location.href = data.webViewLink)}
     >
       <div className="relative aspect-square w-full overflow-hidden rounded-lg">
-        {data.thumbnailLink ? (
+        {data.mimeType?.startsWith('image/') && data.thumbnailLink ? (
           <Image
             src={data.thumbnailLink}
             alt={data.title}
             fill
             className="object-cover"
           />
+        ) : data.iconLink ? (
+          <div className="flex h-full items-center justify-center bg-muted">
+            <img
+              src={data.iconLink.replace("16", "64")}
+              alt={data.title}
+              className="h-16 w-16 object-contain"
+            />
+          </div>
         ) : (
           <div className="flex h-full items-center justify-center bg-muted">
             <span className="text-4xl">{data.fileExtension}</span>

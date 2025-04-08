@@ -29,7 +29,7 @@ import { Input } from "~/components/ui/input";
 import { Label } from "~/components/ui/label";
 
 const TagsSection = () => {
-  const [selectedTag, setSelectedTag] = useState<string | null>(null);
+  const [selectedTags, setSelectedTags] = useState<Set<string>>(new Set());
   const [tagToDelete, setTagToDelete] = useState<string | null>(null);
   const [tagToEdit, setTagToEdit] = useState<{ id: number; name: string } | null>(null);
   const [newTagName, setNewTagName] = useState("");
@@ -50,24 +50,41 @@ const TagsSection = () => {
       tag.name.toLowerCase().includes(searchQuery.toLowerCase())
     );
 
-  // Query for files of selected tag
-  const { data: files, isLoading, error } = useQuery({
-    queryKey: ["files", selectedTag],
+  // Query for files of selected tags
+  const { data: files, isLoading } = useQuery({
+    queryKey: ["files", Array.from(selectedTags)],
     queryFn: async () => {
-      if (!selectedTag) return [];
+      if (selectedTags.size === 0) return [];
       try {
-        const result = await getFilesByTag(selectedTag);
-        return result || [];
+        const results = await Promise.all(
+          Array.from(selectedTags).map(tag => getFilesByTag(tag))
+        );
+        // Merge all files and remove duplicates based on id
+        const uniqueFiles = results.flat().reduce((acc, file) => {
+          if (!acc.some(f => f.id === file.id)) {
+            acc.push(file);
+          }
+          return acc;
+        }, [] as any[]);
+        return uniqueFiles;
       } catch {
         return [];
       }
     },
-    enabled: !!selectedTag,
+    enabled: selectedTags.size > 0,
   });
 
   // Handle tag selection
   const handleTagSelect = (tagName: string) => {
-    setSelectedTag(tagName);
+    setSelectedTags(prev => {
+      const next = new Set(prev);
+      if (next.has(tagName)) {
+        next.delete(tagName);
+      } else {
+        next.add(tagName);
+      }
+      return next;
+    });
   };
 
   // Handle tag deletion
@@ -78,9 +95,11 @@ const TagsSection = () => {
       if (response) {
         toast({ title: "Tag deleted successfully" });
         setTagToDelete(null);
-        if (selectedTag === tagToDelete) {
-          setSelectedTag(null);
-        }
+        setSelectedTags(prev => {
+          const next = new Set(prev);
+          next.delete(tagToDelete);
+          return next;
+        });
         await queryClient.invalidateQueries({ queryKey: ["tags"] });
         await queryClient.invalidateQueries({ queryKey: ["files"] });
       } else {
@@ -106,9 +125,14 @@ const TagsSection = () => {
         toast({ title: "Tag updated successfully" });
         setTagToEdit(null);
         setNewTagName("");
-        if (selectedTag === tagToEdit.name) {
-          setSelectedTag(newTagName);
-        }
+        setSelectedTags(prev => {
+          const next = new Set(prev);
+          if (next.has(tagToEdit.name)) {
+            next.delete(tagToEdit.name);
+            next.add(newTagName);
+          }
+          return next;
+        });
         await queryClient.invalidateQueries({ queryKey: ["tags"] });
         await queryClient.invalidateQueries({ queryKey: ["files"] });
       } else {
@@ -152,13 +176,15 @@ const TagsSection = () => {
             {sortedAndFilteredTags?.map((tag) => (
               <Badge
                 key={tag.id}
-                variant={selectedTag === tag.name ? "default" : "secondary"}
+                variant={selectedTags.has(tag.name) ? "default" : "secondary"}
                 className="flex cursor-pointer items-center justify-between rounded-full px-3 py-1"
+                onClick={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  handleTagSelect(tag.name);
+                }}
               >
-                <span 
-                  className="flex-1 cursor-pointer"
-                  onClick={() => handleTagSelect(tag.name)}
-                >
+                <span className="flex-1">
                   {tag.name}
                 </span>
                 <div className="flex items-center gap-2">
@@ -171,7 +197,10 @@ const TagsSection = () => {
                         variant="ghost"
                         size="icon"
                         className="size-6 rounded-full"
-                        onClick={(e) => e.stopPropagation()}
+                        onClick={(e) => {
+                          e.preventDefault();
+                          e.stopPropagation();
+                        }}
                       >
                         <MoreVertical className="size-4" />
                       </Button>
@@ -205,20 +234,25 @@ const TagsSection = () => {
           </div>
 
           {/* Files Section */}
-          {selectedTag && (
+          {selectedTags.size > 0 && (
             <div className="flex flex-col gap-2">
-              <h3 className="text-balance font-medium">Files with tag &quot;{selectedTag}&quot;</h3>
+              <h3 className="text-balance font-medium">
+                Files with tags: {Array.from(selectedTags).map((tag, index) => (
+                  <span key={tag}>
+                    &quot;{tag}&quot;
+                    {index < selectedTags.size - 1 ? ", " : ""}
+                  </span>
+                ))}
+              </h3>
               <div className="grid w-full grid-cols-[repeat(auto-fill,minmax(9rem,1fr))] gap-2">
                 {isLoading ? (
                   <div className="col-span-full flex justify-center py-8">
                     <Loader2 className="h-8 w-8 animate-spin" />
                   </div>
-                ) : error ? (
-                  <p className="text-sm text-destructive">Error loading files</p>
                 ) : files && files.length > 0 ? (
                   files.map((file) => <FileCard data={file} key={file.id} />)
                 ) : (
-                  <p className="text-sm text-muted-foreground">No files with this tag</p>
+                  <p className="text-sm text-muted-foreground">No files with these tags</p>
                 )}
               </div>
             </div>
@@ -252,26 +286,26 @@ const TagsSection = () => {
           <DialogHeader>
             <DialogTitle>Edit Tag</DialogTitle>
             <DialogDescription>
-              Enter a new name for the tag.
+              Enter a new name for the tag &quot;{tagToEdit?.name}&quot;.
             </DialogDescription>
           </DialogHeader>
           <div className="flex flex-col gap-4">
             <div className="flex flex-col gap-2">
-              <Label htmlFor="name">Name</Label>
+              <Label htmlFor="tagName">Tag Name</Label>
               <Input
-                id="name"
+                id="tagName"
                 value={newTagName}
                 onChange={(e) => setNewTagName(e.target.value)}
                 placeholder="Enter tag name"
               />
             </div>
+            <div className="flex justify-end gap-2">
+              <Button variant="outline" onClick={() => setTagToEdit(null)}>
+                Cancel
+              </Button>
+              <Button onClick={handleEdit}>Save</Button>
+            </div>
           </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setTagToEdit(null)}>
-              Cancel
-            </Button>
-            <Button onClick={handleEdit}>Save Changes</Button>
-          </DialogFooter>
         </DialogContent>
       </Dialog>
     </Dialog>

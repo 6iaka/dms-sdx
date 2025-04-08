@@ -1,5 +1,5 @@
 "use client";
-import { Search, SlidersHorizontal } from "lucide-react";
+import { Search, SlidersHorizontal, X } from "lucide-react";
 import { Button } from "~/components/ui/button";
 import { Input } from "~/components/ui/input";
 import {
@@ -22,6 +22,7 @@ import { useSearchParams, useRouter } from "next/navigation";
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { getAllTags } from "~/server/actions/tag_action";
+import { Badge } from "./ui/badge";
 
 const SearchInput = () => {
   const router = useRouter();
@@ -35,7 +36,7 @@ const SearchInput = () => {
   const [advancedSearch, setAdvancedSearch] = useState({
     type: type || "any",
     name: name,
-    tag: tag || "any",
+    tags: tag ? new Set([tag]) : new Set<string>(),
   });
 
   // Fetch all tags for the dropdown
@@ -56,7 +57,11 @@ const SearchInput = () => {
     if (query) params.append("query", query);
     if (advancedSearch.type !== "any") params.append("type", advancedSearch.type);
     if (advancedSearch.name) params.append("name", advancedSearch.name);
-    if (advancedSearch.tag !== "any") params.append("tag", advancedSearch.tag);
+    if (advancedSearch.tags.size > 0) {
+      Array.from(advancedSearch.tags).forEach(tag => {
+        params.append("tag", tag);
+      });
+    }
     router.push(`/search?${params.toString()}`);
     setOpen(false);
   };
@@ -65,10 +70,28 @@ const SearchInput = () => {
     setAdvancedSearch({
       type: "any",
       name: "",
-      tag: "any",
+      tags: new Set<string>(),
     });
     router.push(`/search?query=${encodeURIComponent(query)}`);
     setOpen(false);
+  };
+
+  const handleTagSelect = (tagName: string) => {
+    setAdvancedSearch(prev => ({
+      ...prev,
+      tags: new Set(prev.tags).add(tagName)
+    }));
+  };
+
+  const handleTagRemove = (tagName: string) => {
+    setAdvancedSearch(prev => {
+      const newTags = new Set(prev.tags);
+      newTags.delete(tagName);
+      return {
+        ...prev,
+        tags: newTags
+      };
+    });
   };
 
   return (
@@ -143,24 +166,48 @@ const SearchInput = () => {
 
             <div className="flex flex-col gap-2">
               <Label>File tag</Label>
-              <Select
-                value={advancedSearch.tag}
-                onValueChange={(value) =>
-                  setAdvancedSearch({ ...advancedSearch, tag: value })
-                }
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="Select the tag that the file should contain" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="any">Any</SelectItem>
-                  {tags?.map((tag) => (
-                    <SelectItem key={tag.id} value={tag.name}>
-                      {tag.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              <div className="flex flex-col gap-2">
+                <Select
+                  onValueChange={handleTagSelect}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select tags to filter by" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {tags?.map((tag) => (
+                      <SelectItem 
+                        key={tag.id} 
+                        value={tag.name}
+                        disabled={advancedSearch.tags.has(tag.name)}
+                      >
+                        {tag.name} {advancedSearch.tags.has(tag.name) && '(selected)'}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                
+                {advancedSearch.tags.size > 0 && (
+                  <div className="flex flex-wrap gap-2">
+                    {Array.from(advancedSearch.tags).map((tagName) => (
+                      <Badge 
+                        key={tagName} 
+                        variant="secondary"
+                        className="flex items-center gap-1"
+                      >
+                        {tagName}
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="size-4 rounded-full p-0 hover:bg-destructive/20"
+                          onClick={() => handleTagRemove(tagName)}
+                        >
+                          <X className="size-3" />
+                        </Button>
+                      </Badge>
+                    ))}
+                  </div>
+                )}
+              </div>
             </div>
           </div>
 
