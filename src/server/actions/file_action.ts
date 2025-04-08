@@ -209,8 +209,7 @@ export async function getFilesByTag(tagIdOrName: string) {
       throw new Error("Unauthorized");
     }
 
-    const isId = !isNaN(Number(tagIdOrName));
-    const files = await fileService.findByTag(tagIdOrName, isId);
+    const files = await fileService.findByTag(tagIdOrName, user.id);
     return files;
   } catch (error) {
     console.error("Error in getFilesByTag:", error);
