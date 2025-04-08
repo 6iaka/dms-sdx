@@ -1,6 +1,14 @@
 "use client";
-import type { File as FileData, Tag } from "@prisma/client";
-import { EllipsisVertical, Trash } from "lucide-react";
+import type { File, Tag } from "@prisma/client";
+import { useRouter } from "next/navigation";
+import { Button } from "./ui/button";
+import { Card, CardContent, CardHeader, CardTitle } from "./ui/card";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "./ui/dialog";
+import { EditFileForm } from "./EditFileForm";
+import { Trash2 } from "lucide-react";
+import { deleteFile } from "~/server/actions/file_action";
+import { toast } from "sonner";
+import { EllipsisVertical } from "lucide-react";
 import Image from "next/image";
 import { useState, useTransition } from "react";
 import {
@@ -10,25 +18,19 @@ import {
   DropdownMenuTrigger,
 } from "~/components/ui/dropdown-menu";
 import { cn, formatFileSize } from "~/lib/utils";
-import { deleteFile } from "~/server/actions/file_action";
-import { Button } from "./ui/button";
-import EditFileForm from "./forms/EditFileForm";
-import { useToast } from "~/hooks/use-toast";
 import { useQueryClient } from "@tanstack/react-query";
-import { useRouter } from "next/navigation";
 
 type Props = { 
-  data: FileData & {
+  data: File & {
     tags: Tag[];
   };
   isSelecting?: boolean;
   isSelected?: boolean;
-  onSelect?: (selected: boolean) => void;
+  onSelect?: (fileId: number) => void;
 };
 
 const FileCard = ({ data, isSelecting, isSelected, onSelect }: Props) => {
   const [isPending, startTransition] = useTransition();
-  const { toast } = useToast();
   const queryClient = useQueryClient();
   const router = useRouter();
 
@@ -36,7 +38,7 @@ const FileCard = ({ data, isSelecting, isSelected, onSelect }: Props) => {
     if (isSelecting && onSelect) {
       e.preventDefault();
       e.stopPropagation();
-      onSelect(!isSelected);
+      onSelect(data.id);
     }
   };
 
@@ -44,21 +46,14 @@ const FileCard = ({ data, isSelecting, isSelected, onSelect }: Props) => {
     try {
       const result = await deleteFile(data.id);
       if (result) {
-        toast({
-          title: "Success",
-          description: "File deleted successfully",
-        });
+        toast.success("File deleted successfully");
         await queryClient.invalidateQueries({ queryKey: ["files"] });
       } else {
         throw new Error("Failed to delete file");
       }
     } catch (error) {
       console.error("Error deleting file:", error);
-      toast({
-        title: "Error",
-        description: error instanceof Error ? error.message : "Failed to delete file",
-        variant: "destructive",
-      });
+      toast.error(error instanceof Error ? error.message : "Failed to delete file");
     }
   };
 
@@ -142,7 +137,7 @@ const FileCard = ({ data, isSelecting, isSelected, onSelect }: Props) => {
                 startTransition(handleDelete);
               }}
             >
-              <Trash className="h-4 w-4" />
+              <Trash2 className="h-4 w-4" />
               <span>Delete</span>
             </DropdownMenuItem>
           </DropdownMenuContent>

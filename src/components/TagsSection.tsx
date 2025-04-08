@@ -27,7 +27,7 @@ import {
 } from "~/components/ui/dropdown-menu";
 import { Input } from "~/components/ui/input";
 import { Label } from "~/components/ui/label";
-import { Category } from "@prisma/client";
+import type { Tag } from "@prisma/client";
 
 type FileWithTags = {
   id: number;
@@ -45,7 +45,7 @@ type FileWithTags = {
   updatedAt: Date;
   folderId: number;
   userClerkId: string;
-  categeory: Category;
+  categeory: Tag;
   googleId: string;
   description: string | null;
   tags: {
