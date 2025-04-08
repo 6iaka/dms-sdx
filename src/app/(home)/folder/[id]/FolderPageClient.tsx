@@ -53,15 +53,15 @@ const FolderPageClient = ({ data }: { data: FolderWithChildren }) => {
     queryFn: async () => await getAllTags(),
   });
 
-  const handleSelect = (fileId: number, selected: boolean) => {
+  const handleSelect = (fileId: number) => {
     setSelectedFiles(prev => {
-      const next = new Set(prev);
-      if (selected) {
-        next.add(fileId);
+      const newSet = new Set(prev);
+      if (newSet.has(fileId)) {
+        newSet.delete(fileId);
       } else {
-        next.delete(fileId);
+        newSet.add(fileId);
       }
-      return next;
+      return newSet;
     });
   };
 
@@ -205,12 +205,22 @@ const FolderPageClient = ({ data }: { data: FolderWithChildren }) => {
           <div className="grid w-full grid-cols-[repeat(auto-fill,minmax(9rem,1fr))] gap-2">
             {data.files.length > 0 ? (
               data.files.map((item) => (
-                <FileCard 
-                  data={item} 
+                <FileCard
                   key={item.id}
+                  data={item}
                   isSelecting={isSelecting}
                   isSelected={selectedFiles.has(item.id)}
-                  onSelect={(selected) => handleSelect(item.id, selected)}
+                  onSelect={(fileId) => {
+                    setSelectedFiles(prev => {
+                      const newSet = new Set(prev);
+                      if (newSet.has(fileId)) {
+                        newSet.delete(fileId);
+                      } else {
+                        newSet.add(fileId);
+                      }
+                      return newSet;
+                    });
+                  }}
                 />
               ))
             ) : (
