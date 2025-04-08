@@ -74,8 +74,6 @@ const TagsSection = () => {
   const [tagToEdit, setTagToEdit] = useState<{ id: number; name: string } | null>(null);
   const [newTagName, setNewTagName] = useState("");
   const [searchQuery, setSearchQuery] = useState("");
-  const [files, setFiles] = useState<FileWithTags[]>([]);
-  const [isLoading, setIsLoading] = useState(false);
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
@@ -93,7 +91,7 @@ const TagsSection = () => {
     );
 
   // Query for files of selected tags
-  const { data: queryFiles, isLoading: queryLoading } = useQuery({
+  const { data: files, isLoading } = useQuery({
     queryKey: ["files", Array.from(selectedTags)],
     queryFn: async () => {
       if (selectedTags.size === 0) return [];
@@ -191,35 +189,6 @@ const TagsSection = () => {
     }
   };
 
-  const fetchFilesForTags = async (tagIds: number[]) => {
-    const filesPromises = tagIds.map(tagId =>
-      getFilesByTag(tagId.toString())
-    );
-    const filesResults = await Promise.all(filesPromises);
-    const allFiles = filesResults.flat();
-    
-    // Remove duplicates based on file ID
-    const uniqueFiles = Array.from(new Map(allFiles.map(file => [file.id, file])).values());
-    return uniqueFiles;
-  };
-
-  const handleTagClick = async (tag: { id: number; name: string }) => {
-    const newSelectedTags = new Set(selectedTags);
-    if (newSelectedTags.has(tag.id)) {
-      newSelectedTags.delete(tag.id);
-    } else {
-      newSelectedTags.add(tag.id);
-    }
-    setSelectedTags(newSelectedTags);
-
-    if (newSelectedTags.size > 0) {
-      const files = await fetchFilesForTags(Array.from(newSelectedTags));
-      setFiles(files);
-    } else {
-      setFiles([]);
-    }
-  };
-
   return (
     <Dialog>
       <DialogTrigger asChild>
@@ -308,20 +277,23 @@ const TagsSection = () => {
           {selectedTags.size > 0 && (
             <div className="flex flex-col gap-2">
               <h3 className="text-balance font-medium">
-                Files with tags: {Array.from(selectedTags).map((tag, index) => (
-                  <span key={tag}>
-                    &quot;{tag}&quot;
-                    {index < selectedTags.size - 1 ? ", " : ""}
-                  </span>
-                ))}
+                Files with tags: {Array.from(selectedTags).map((tagId, index) => {
+                  const tag = tags?.find(t => t.id === tagId);
+                  return (
+                    <span key={tagId}>
+                      &quot;{tag?.name}&quot;
+                      {index < selectedTags.size - 1 ? ", " : ""}
+                    </span>
+                  );
+                })}
               </h3>
               <div className="grid w-full grid-cols-[repeat(auto-fill,minmax(9rem,1fr))] gap-2">
-                {queryLoading ? (
+                {isLoading ? (
                   <div className="col-span-full flex justify-center py-8">
                     <Loader2 className="h-8 w-8 animate-spin" />
                   </div>
-                ) : queryFiles && queryFiles.length > 0 ? (
-                  queryFiles.map((file) => <FileCard data={file} key={file.id} />)
+                ) : files && files.length > 0 ? (
+                  files.map((file: FileWithTags) => <FileCard data={file} key={file.id} />)
                 ) : (
                   <p className="text-sm text-muted-foreground">No files with these tags</p>
                 )}
