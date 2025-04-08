@@ -28,6 +28,15 @@ import {
 import { Input } from "~/components/ui/input";
 import { Label } from "~/components/ui/label";
 
+interface FileWithTags {
+  id: number;
+  title: string;
+  mimeType: string | null;
+  thumbnailLink: string | null;
+  iconLink: string | null;
+  tags: { id: number; name: string }[];
+}
+
 const TagsSection = () => {
   const [selectedTags, setSelectedTags] = useState<Set<string>>(new Set());
   const [tagToDelete, setTagToDelete] = useState<string | null>(null);
@@ -146,6 +155,35 @@ const TagsSection = () => {
         title: "Error updating tag",
         variant: "destructive",
       });
+    }
+  };
+
+  const fetchFilesForTags = async (tagIds: number[]) => {
+    const filesPromises = tagIds.map(tagId =>
+      getFilesByTag(tagId)
+    );
+    const filesResults = await Promise.all(filesPromises);
+    const allFiles = filesResults.flat();
+    
+    // Remove duplicates based on file ID
+    const uniqueFiles = Array.from(new Map(allFiles.map(file => [file.id, file])).values());
+    return uniqueFiles;
+  };
+
+  const handleTagClick = async (tag: { id: number; name: string }) => {
+    const newSelectedTags = new Set(selectedTags);
+    if (newSelectedTags.has(tag.id)) {
+      newSelectedTags.delete(tag.id);
+    } else {
+      newSelectedTags.add(tag.id);
+    }
+    setSelectedTags(newSelectedTags);
+
+    if (newSelectedTags.size > 0) {
+      const files = await fetchFilesForTags(Array.from(newSelectedTags));
+      // setFiles(files);
+    } else {
+      // setFiles([]);
     }
   };
 

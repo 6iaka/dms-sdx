@@ -138,7 +138,7 @@ export const deleteFolder = async (id: number) => {
         try {
           // Try to delete from Google Drive first
           await driveService.deleteItem(child.googleId);
-        } catch (error) {
+        } catch {
           // If the item doesn't exist in Drive, just log it and continue
           console.log(`Item ${child.googleId} not found in Drive, proceeding with database deletion`);
         }
@@ -153,7 +153,7 @@ export const deleteFolder = async (id: number) => {
     try {
       // Try to delete from Google Drive first
       await driveService.deleteItem(folder.googleId);
-    } catch (error) {
+    } catch {
       // If the item doesn't exist in Drive, just log it and continue
       console.log(`Item ${folder.googleId} not found in Drive, proceeding with database deletion`);
     }

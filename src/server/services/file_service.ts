@@ -1,6 +1,7 @@
 "server only";
 
-import type { File as FileData, Prisma } from "@prisma/client";
+import { PrismaClient } from "@prisma/client";
+import type { Prisma } from "@prisma/client";
 import { db } from "../db";
 
 export class FileService {

@@ -15,6 +15,7 @@ import { Button } from "./ui/button";
 import EditFileForm from "./forms/EditFileForm";
 import { useToast } from "~/hooks/use-toast";
 import { useQueryClient } from "@tanstack/react-query";
+import { useRouter } from "next/navigation";
 
 type Props = { 
   data: FileData & {
@@ -29,6 +30,7 @@ const FileCard = ({ data, isSelecting, isSelected, onSelect }: Props) => {
   const [isPending, startTransition] = useTransition();
   const { toast } = useToast();
   const queryClient = useQueryClient();
+  const router = useRouter();
 
   const handleClick = (e: React.MouseEvent) => {
     if (isSelecting && onSelect) {
@@ -74,23 +76,29 @@ const FileCard = ({ data, isSelecting, isSelected, onSelect }: Props) => {
     >
       <div className="relative aspect-square w-full overflow-hidden rounded-lg">
         {data.mimeType?.startsWith('image/') && data.thumbnailLink ? (
-          <Image
-            src={data.thumbnailLink}
-            alt={data.title}
-            fill
-            className="object-cover"
-          />
+          <div className="relative w-full h-48">
+            <Image
+              src={data.thumbnailLink}
+              alt={data.title}
+              fill
+              className="object-cover rounded-t-lg"
+            />
+          </div>
         ) : data.iconLink ? (
-          <div className="flex h-full items-center justify-center bg-muted">
-            <img
+          <div className="flex items-center justify-center h-48 bg-gray-100 rounded-t-lg">
+            <Image
               src={data.iconLink.replace("16", "64")}
               alt={data.title}
-              className="h-16 w-16 object-contain"
+              width={64}
+              height={64}
+              className="object-contain"
             />
           </div>
         ) : (
-          <div className="flex h-full items-center justify-center bg-muted">
-            <span className="text-4xl">{data.fileExtension}</span>
+          <div className="flex items-center justify-center h-48 bg-gray-100 rounded-t-lg">
+            <span className="text-2xl font-bold text-gray-500">
+              {data.title.split('.').pop()?.toUpperCase()}
+            </span>
           </div>
         )}
         {isSelecting && (
