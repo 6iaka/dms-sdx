@@ -160,7 +160,7 @@ const TagsSection = () => {
 
   const fetchFilesForTags = async (tagIds: number[]) => {
     const filesPromises = tagIds.map(tagId =>
-      getFilesByTag(tagId)
+      getFilesByTag(tagId.toString())
     );
     const filesResults = await Promise.all(filesPromises);
     const allFiles = filesResults.flat();
