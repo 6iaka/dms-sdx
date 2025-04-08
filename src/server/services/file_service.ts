@@ -70,18 +70,19 @@ export class FileService {
   };
 
   /**
-   * Get files by tag name
-   * @param tagName Name of the tag to filter by
+   * Get files by tag name or ID
+   * @param tagIdOrName ID or name of the tag to filter by
+   * @param isId Whether the input is a tag ID
    * @returns Array of files with the specified tag
    */
-  findByTag = async (tagName: string) => {
+  findByTag = async (tagIdOrName: string, isId: boolean = false) => {
     try {
       const files = await db.file.findMany({
         where: {
           tags: {
-            some: {
-              name: tagName
-            }
+            some: isId 
+              ? { id: Number(tagIdOrName) }
+              : { name: tagIdOrName }
           }
         },
         include: {

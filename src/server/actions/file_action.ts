@@ -202,14 +202,15 @@ export const updateFile = async (id: number, data: {
   }
 };
 
-export async function getFilesByTag(tagName: string) {
+export async function getFilesByTag(tagIdOrName: string) {
   try {
     const user = await currentUser();
     if (!user) {
       throw new Error("Unauthorized");
     }
 
-    const files = await fileService.findByTag(tagName);
+    const isId = !isNaN(Number(tagIdOrName));
+    const files = await fileService.findByTag(tagIdOrName, isId);
     return files;
   } catch (error) {
     console.error("Error in getFilesByTag:", error);
