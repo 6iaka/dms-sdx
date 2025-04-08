@@ -27,22 +27,55 @@ import {
 } from "~/components/ui/dropdown-menu";
 import { Input } from "~/components/ui/input";
 import { Label } from "~/components/ui/label";
+import { Category } from "@prisma/client";
 
-interface FileWithTags {
+type FileWithTags = {
   id: number;
   title: string;
-  mimeType: string | null;
+  mimeType: string;
   thumbnailLink: string | null;
-  iconLink: string | null;
-  tags: { id: number; name: string }[];
-}
+  iconLink: string;
+  webViewLink: string;
+  webContentLink: string;
+  fileSize: number;
+  fileExtension: string;
+  originalFilename: string;
+  trashed: boolean | null;
+  createdAt: Date;
+  updatedAt: Date;
+  folderId: number;
+  userClerkId: string;
+  categeory: Category;
+  googleId: string;
+  description: string | null;
+  tags: {
+    id: number;
+    name: string;
+    createdAt: Date;
+    updatedAt: Date;
+  }[];
+  folder: {
+    id: number;
+    title: string;
+    googleId: string;
+    userClerkId: string;
+    description: string | null;
+    isRoot: boolean;
+    parentId: number | null;
+    createdAt: Date;
+    updatedAt: Date;
+    isFavorite: boolean;
+  };
+};
 
 const TagsSection = () => {
-  const [selectedTags, setSelectedTags] = useState<Set<string>>(new Set());
-  const [tagToDelete, setTagToDelete] = useState<string | null>(null);
+  const [selectedTags, setSelectedTags] = useState<Set<number>>(new Set());
+  const [tagToDelete, setTagToDelete] = useState<number | null>(null);
   const [tagToEdit, setTagToEdit] = useState<{ id: number; name: string } | null>(null);
   const [newTagName, setNewTagName] = useState("");
   const [searchQuery, setSearchQuery] = useState("");
+  const [files, setFiles] = useState<FileWithTags[]>([]);
+  const [isLoading, setIsLoading] = useState(false);
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
@@ -60,13 +93,13 @@ const TagsSection = () => {
     );
 
   // Query for files of selected tags
-  const { data: files, isLoading } = useQuery({
+  const { data: queryFiles, isLoading: queryLoading } = useQuery({
     queryKey: ["files", Array.from(selectedTags)],
     queryFn: async () => {
       if (selectedTags.size === 0) return [];
       try {
         const results = await Promise.all(
-          Array.from(selectedTags).map(tag => getFilesByTag(tag))
+          Array.from(selectedTags).map(tagId => getFilesByTag(tagId.toString()))
         );
         // Merge all files and remove duplicates based on id
         const uniqueFiles = results.flat().reduce((acc, file) => {
@@ -74,7 +107,7 @@ const TagsSection = () => {
             acc.push(file);
           }
           return acc;
-        }, [] as any[]);
+        }, [] as FileWithTags[]);
         return uniqueFiles;
       } catch {
         return [];
@@ -84,13 +117,13 @@ const TagsSection = () => {
   });
 
   // Handle tag selection
-  const handleTagSelect = (tagName: string) => {
+  const handleTagSelect = (tagId: number) => {
     setSelectedTags(prev => {
       const next = new Set(prev);
-      if (next.has(tagName)) {
-        next.delete(tagName);
+      if (next.has(tagId)) {
+        next.delete(tagId);
       } else {
-        next.add(tagName);
+        next.add(tagId);
       }
       return next;
     });
@@ -100,7 +133,7 @@ const TagsSection = () => {
   const handleDelete = async () => {
     if (!tagToDelete) return;
     try {
-      const response = await deleteTag(tagToDelete);
+      const response = await deleteTag(tagToDelete.toString());
       if (response) {
         toast({ title: "Tag deleted successfully" });
         setTagToDelete(null);
@@ -136,9 +169,9 @@ const TagsSection = () => {
         setNewTagName("");
         setSelectedTags(prev => {
           const next = new Set(prev);
-          if (next.has(tagToEdit.name)) {
-            next.delete(tagToEdit.name);
-            next.add(newTagName);
+          if (next.has(tagToEdit.id)) {
+            next.delete(tagToEdit.id);
+            next.add(tagToEdit.id);
           }
           return next;
         });
@@ -181,9 +214,9 @@ const TagsSection = () => {
 
     if (newSelectedTags.size > 0) {
       const files = await fetchFilesForTags(Array.from(newSelectedTags));
-      // setFiles(files);
+      setFiles(files);
     } else {
-      // setFiles([]);
+      setFiles([]);
     }
   };
 
@@ -214,12 +247,12 @@ const TagsSection = () => {
             {sortedAndFilteredTags?.map((tag) => (
               <Badge
                 key={tag.id}
-                variant={selectedTags.has(tag.name) ? "default" : "secondary"}
+                variant={selectedTags.has(tag.id) ? "default" : "secondary"}
                 className="flex cursor-pointer items-center justify-between rounded-full px-3 py-1"
                 onClick={(e) => {
                   e.preventDefault();
                   e.stopPropagation();
-                  handleTagSelect(tag.name);
+                  handleTagSelect(tag.id);
                 }}
               >
                 <span className="flex-1">
@@ -258,7 +291,7 @@ const TagsSection = () => {
                         className="text-destructive focus:text-destructive"
                         onClick={(e) => {
                           e.stopPropagation();
-                          setTagToDelete(tag.name);
+                          setTagToDelete(tag.id);
                         }}
                       >
                         <Trash2 className="mr-2 size-4" />
@@ -283,12 +316,12 @@ const TagsSection = () => {
                 ))}
               </h3>
               <div className="grid w-full grid-cols-[repeat(auto-fill,minmax(9rem,1fr))] gap-2">
-                {isLoading ? (
+                {queryLoading ? (
                   <div className="col-span-full flex justify-center py-8">
                     <Loader2 className="h-8 w-8 animate-spin" />
                   </div>
-                ) : files && files.length > 0 ? (
-                  files.map((file) => <FileCard data={file} key={file.id} />)
+                ) : queryFiles && queryFiles.length > 0 ? (
+                  queryFiles.map((file) => <FileCard data={file} key={file.id} />)
                 ) : (
                   <p className="text-sm text-muted-foreground">No files with these tags</p>
                 )}
