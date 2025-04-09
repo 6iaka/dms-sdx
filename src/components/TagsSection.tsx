@@ -27,21 +27,27 @@ import {
 } from "~/components/ui/dropdown-menu";
 import { Input } from "~/components/ui/input";
 import { Label } from "~/components/ui/label";
+import type { File as FileData, Category } from "@prisma/client";
 
-interface Tag {
-  id: number;
-  name: string;
-  _count: {
-    files: number;
+type File = FileData & {
+  folder: {
+    id: number;
+    title: string;
+    googleId: string;
+    userClerkId: string;
+    description: string | null;
+    isRoot: boolean;
+    parentId: number | null;
+    createdAt: Date;
+    updatedAt: Date;
+    isFavorite: boolean;
   };
-}
-
-interface File {
-  id: number;
-  title: string;
-  mimeType: string;
-  thumbnailLink?: string;
-  webContentLink?: string;
+  tags: {
+    id: number;
+    name: string;
+    createdAt: Date;
+    updatedAt: Date;
+  }[];
 }
 
 const TagsSection = () => {
@@ -76,12 +82,12 @@ const TagsSection = () => {
           Array.from(selectedTags).map(tag => getFilesByTag(tag))
         );
         // Merge all files and remove duplicates based on id
-        const uniqueFiles = results.flat().reduce((acc, file) => {
+        const uniqueFiles = results.flat().reduce((acc: File[], file) => {
           if (!acc.some(f => f.id === file.id)) {
             acc.push(file);
           }
           return acc;
-        }, [] as any[]);
+        }, []);
         return uniqueFiles;
       } catch {
         return [];
@@ -163,25 +169,6 @@ const TagsSection = () => {
         variant: "destructive",
       });
     }
-  };
-
-  const fetchFilesForTags = async (tagNames: string[]) => {
-    const filePromises = tagNames.map(async (tagName) => {
-      const response = await fetch(`/api/files?tag=${tagName}`);
-      const data = await response.json();
-      return data as File[];
-    });
-
-    const results = await Promise.all(filePromises);
-    const uniqueFiles = new Map<number, File>();
-    
-    results.flat().forEach((file) => {
-      if (!uniqueFiles.has(file.id)) {
-        uniqueFiles.set(file.id, file);
-      }
-    });
-
-    return Array.from(uniqueFiles.values());
   };
 
   return (
