@@ -147,10 +147,17 @@ export const deleteFile = async (id: number) => {
     const file = await fileService.findById(id);
     if (!file) throw new Error("File not found");
 
+    // First try to delete from Google Drive
+    try {
+      await driveService.deleteItem(file.googleId);
+    } catch (error) {
+      // If we can't delete from Drive, still try to delete from our database
+      console.error("Error deleting from Google Drive:", error);
+    }
+
+    // Then delete from our database
     const deletedFile = await fileService.delete(id);
     if (!deletedFile) throw new Error("Failed to delete file from database");
-
-    await driveService.deleteItem(deletedFile.googleId);
 
     revalidatePath("/");
     revalidatePath("/folder/:id", "page");

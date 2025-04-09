@@ -55,11 +55,28 @@ const FileCard = ({ data, isSelecting, isSelected, onSelect }: Props) => {
       await queryClient.invalidateQueries({ queryKey: ["files"] });
     } catch (error) {
       console.error("Error deleting file:", error);
-      toast({
-        title: "Error",
-        description: error instanceof Error ? error.message : "Failed to delete file",
-        variant: "destructive",
-      });
+      const errorMessage = error instanceof Error ? error.message : "Failed to delete file";
+      
+      // Handle specific error cases
+      if (errorMessage.includes("File not found")) {
+        toast({
+          title: "Error",
+          description: "The file could not be found. It may have been already deleted.",
+          variant: "destructive",
+        });
+      } else if (errorMessage.includes("permissions")) {
+        toast({
+          title: "Error",
+          description: "You don't have permission to delete this file.",
+          variant: "destructive",
+        });
+      } else {
+        toast({
+          title: "Error",
+          description: errorMessage,
+          variant: "destructive",
+        });
+      }
     }
   };
 
