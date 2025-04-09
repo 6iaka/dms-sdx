@@ -37,7 +37,7 @@ import { uploadFile } from "~/server/actions/file_action";
 import { getAllTags } from "~/server/actions/tag_action";
 
 const formSchema = z.object({
-  file: z.instanceof(File),
+  file: z.instanceof(File).nullable(),
   tagNames: z.array(z.string()).optional(),
   description: z.string().min(1).optional(),
 });
@@ -58,7 +58,7 @@ const FileUploadForm = ({ folderId }: Props) => {
 
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
-    defaultValues: { tagNames: [] },
+    defaultValues: { file: null, tagNames: [] },
   });
 
   const handleExternalDrop = async (url: string) => {
@@ -85,6 +85,15 @@ const FileUploadForm = ({ folderId }: Props) => {
   };
 
   const onSubmit = async (values: z.infer<typeof formSchema>) => {
+    if (!values.file) {
+      toast({
+        title: "Error",
+        description: "Please select a file to upload",
+        variant: "destructive",
+      });
+      return;
+    }
+
     const response = await uploadFile({
       description: values.description,
       tagNames: selectedTags,
@@ -144,8 +153,10 @@ const FileUploadForm = ({ folderId }: Props) => {
                         // Handle file drops
                         if (e.dataTransfer.files.length > 0) {
                           const file = e.dataTransfer.files[0];
-                          onChange(file);
-                          form.setValue("file", file);
+                          if (file) {
+                            onChange(file);
+                            form.setValue("file", file);
+                          }
                           return;
                         }
 
