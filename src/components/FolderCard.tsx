@@ -3,7 +3,7 @@ import type { Folder } from "@prisma/client";
 import { EllipsisVertical, Loader2, Star, Trash } from "lucide-react";
 import Link from "next/link";
 import { cn } from "~/lib/utils";
-import { deleteFolder, toggleFolderFavorite } from "~/server/actions/folder_action";
+import { deleteFolder, toggleFolderFavorite, editFolder } from "~/server/actions/folder_action";
 import EditFolderForm from "./forms/EditFolderForm";
 import { Button } from "./ui/button";
 import { useToast } from "~/hooks/use-toast";
@@ -31,13 +31,33 @@ const FolderCard = ({ data }: Props) => {
         title: "Success",
         description: "Folder deleted successfully",
       });
-      // Invalidate all relevant queries
       await queryClient.invalidateQueries({ queryKey: ["folders"] });
       await queryClient.invalidateQueries({ queryKey: ["files"] });
-    } catch (error) {
+    } catch {
       toast({
         title: "Error",
         description: "Failed to delete folder",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const handleEdit = async (newName: string) => {
+    try {
+      await editFolder({
+        id: data.id,
+        title: newName,
+        description: data.description || undefined
+      });
+      toast({
+        title: "Success",
+        description: "Folder renamed successfully",
+      });
+      await queryClient.invalidateQueries({ queryKey: ["folders"] });
+    } catch {
+      toast({
+        title: "Error",
+        description: "Failed to rename folder",
         variant: "destructive",
       });
     }

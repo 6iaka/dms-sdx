@@ -28,6 +28,22 @@ import {
 import { Input } from "~/components/ui/input";
 import { Label } from "~/components/ui/label";
 
+interface Tag {
+  id: number;
+  name: string;
+  _count: {
+    files: number;
+  };
+}
+
+interface File {
+  id: number;
+  title: string;
+  mimeType: string;
+  thumbnailLink?: string;
+  webContentLink?: string;
+}
+
 const TagsSection = () => {
   const [selectedTags, setSelectedTags] = useState<Set<string>>(new Set());
   const [tagToDelete, setTagToDelete] = useState<string | null>(null);
@@ -147,6 +163,25 @@ const TagsSection = () => {
         variant: "destructive",
       });
     }
+  };
+
+  const fetchFilesForTags = async (tagNames: string[]) => {
+    const filePromises = tagNames.map(async (tagName) => {
+      const response = await fetch(`/api/files?tag=${tagName}`);
+      const data = await response.json();
+      return data as File[];
+    });
+
+    const results = await Promise.all(filePromises);
+    const uniqueFiles = new Map<number, File>();
+    
+    results.flat().forEach((file) => {
+      if (!uniqueFiles.has(file.id)) {
+        uniqueFiles.set(file.id, file);
+      }
+    });
+
+    return Array.from(uniqueFiles.values());
   };
 
   return (

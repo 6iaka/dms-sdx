@@ -5,7 +5,6 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { FileCheck, Loader2 } from "lucide-react";
 import { useState } from "react";
 import { useForm } from "react-hook-form";
-import Dropzone from "shadcn-dropzone";
 import { z } from "zod";
 import { Button } from "~/components/ui/button";
 import {
@@ -73,7 +72,7 @@ const FileUploadForm = ({ folderId }: Props) => {
         title: "Success",
         description: "File downloaded successfully",
       });
-    } catch (error) {
+    } catch {
       toast({
         title: "Error",
         description: "Failed to download file",

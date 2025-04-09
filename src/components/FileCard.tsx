@@ -11,10 +11,17 @@ import {
 } from "~/components/ui/dropdown-menu";
 import { cn, formatFileSize } from "~/lib/utils";
 import { deleteFile } from "~/server/actions/file_action";
-import { Button } from "./ui/button";
+import { Button } from "~/components/ui/button";
 import EditFileForm from "./forms/EditFileForm";
 import { useToast } from "~/hooks/use-toast";
 import { useQueryClient } from "@tanstack/react-query";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "~/components/ui/dialog";
 
 type Props = { 
   data: FileData & {
