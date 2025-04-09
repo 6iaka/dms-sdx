@@ -232,6 +232,24 @@ export class FileService {
       throw new Error((error as Error).message);
     }
   };
+
+  /**
+   * Move files to a different folder
+   * @param fileIds Array of file IDs to move
+   * @param targetFolderId ID of the target folder
+   * @returns Updated files
+   */
+  move = async (fileIds: number[], targetFolderId: number) => {
+    try {
+      const updated = await db.file.updateMany({
+        where: { id: { in: fileIds } },
+        data: { folderId: targetFolderId },
+      });
+      return updated;
+    } catch (error) {
+      throw new Error((error as Error).message);
+    }
+  };
 }
 
 const fileService = new FileService();

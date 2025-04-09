@@ -26,7 +26,7 @@ import {
   SelectValue,
 } from "~/components/ui/select";
 import { useToast } from "~/hooks/use-toast";
-import { deleteFile, assignTagToFiles } from "~/server/actions/file_action";
+import { deleteFile, assignTagToFiles, moveFiles } from "~/server/actions/file_action";
 import { getAllTags } from "~/server/actions/tag_action";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Badge } from "~/components/ui/badge";
@@ -47,6 +47,8 @@ const FolderPageClient = ({ data }: { data: FolderWithChildren }) => {
   const [showTagDialog, setShowTagDialog] = useState(false);
   const [selectedTags, setSelectedTags] = useState<string[]>([]);
   const [existingTags, setExistingTags] = useState<string[]>([]);
+  const [showMoveDialog, setShowMoveDialog] = useState(false);
+  const [targetFolderId, setTargetFolderId] = useState<number | null>(null);
 
   const { data: tags } = useQuery({
     queryKey: ["tags"],
@@ -80,7 +82,8 @@ const FolderPageClient = ({ data }: { data: FolderWithChildren }) => {
       // Invalidate queries to refresh the data
       await queryClient.invalidateQueries({ queryKey: ["files"] });
       await queryClient.invalidateQueries({ queryKey: ["tags"] });
-    } catch {
+    } catch (error) {
+      console.error("Failed to delete files:", error);
       toast({
         title: "Error",
         description: "Failed to delete files",
@@ -112,6 +115,32 @@ const FolderPageClient = ({ data }: { data: FolderWithChildren }) => {
       toast({
         title: "Error",
         description: "Failed to assign tags",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const handleMove = async () => {
+    if (!targetFolderId) return;
+    
+    try {
+      await moveFiles({
+        fileIds: Array.from(selectedFiles),
+        targetFolderId,
+      });
+      toast({
+        title: "Success",
+        description: "Files moved successfully",
+      });
+      setShowMoveDialog(false);
+      setTargetFolderId(null);
+      setSelectedFiles(new Set());
+      setIsSelecting(false);
+      await queryClient.invalidateQueries({ queryKey: ["files"] });
+    } catch {
+      toast({
+        title: "Error",
+        description: "Failed to move files",
         variant: "destructive",
       });
     }
@@ -172,11 +201,22 @@ const FolderPageClient = ({ data }: { data: FolderWithChildren }) => {
                 >
                   Assign Tag
                 </Button>
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  onClick={() => setShowMoveDialog(true)}
+                >
+                  Move
+                </Button>
               </>
             )}
             <SelectionMode onSelect={setIsSelecting} />
-            <FileUploadForm folderId={data.id} />
-            <CreateFolderForm parentId={data.id} />
+            {!isSelecting && (
+              <>
+                <FileUploadForm folderId={data.id} />
+                <CreateFolderForm parentId={data.id} />
+              </>
+            )}
           </div>
         </div>
         <h2 className="text-xl font-bold capitalize">{data.title}</h2>
@@ -300,6 +340,45 @@ const FolderPageClient = ({ data }: { data: FolderWithChildren }) => {
             </Button>
             <Button onClick={handleAssignTag} disabled={selectedTags.length === 0}>
               Assign Tags
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={showMoveDialog} onOpenChange={setShowMoveDialog}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Move Files</DialogTitle>
+            <DialogDescription>
+              Select a folder to move {selectedFiles.size} file{selectedFiles.size !== 1 ? "s" : ""} to.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="flex flex-col gap-4">
+            <Select
+              value={targetFolderId?.toString()}
+              onValueChange={(value) => setTargetFolderId(Number(value))}
+            >
+              <SelectTrigger>
+                <SelectValue placeholder="Select a folder" />
+              </SelectTrigger>
+              <SelectContent>
+                {data.children.map((folder) => (
+                  <SelectItem key={folder.id} value={folder.id.toString()}>
+                    {folder.title}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowMoveDialog(false)}>
+              Cancel
+            </Button>
+            <Button 
+              onClick={handleMove}
+              disabled={!targetFolderId}
+            >
+              Move
             </Button>
           </DialogFooter>
         </DialogContent>

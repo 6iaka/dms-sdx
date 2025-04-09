@@ -267,3 +267,27 @@ export const assignTagToFiles = async ({
     throw new Error(error instanceof Error ? error.message : "Failed to assign tags");
   }
 };
+
+export const moveFiles = async ({
+  fileIds,
+  targetFolderId,
+}: {
+  fileIds: number[];
+  targetFolderId: number;
+}) => {
+  const user = await currentUser();
+
+  try {
+    if (!user) throw new Error("Not authorized");
+    
+    const updated = await fileService.move(fileIds, targetFolderId);
+
+    revalidatePath("/");
+    revalidatePath("/folder/:id", "page");
+
+    return updated;
+  } catch (error) {
+    console.error("Error moving files:", error);
+    throw error;
+  }
+};
