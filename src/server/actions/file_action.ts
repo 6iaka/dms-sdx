@@ -243,14 +243,26 @@ export const assignTagToFiles = async ({
   try {
     if (!user) throw new Error("Not authorized");
 
-    // Update each file individually to ensure proper tag connection
-    const updatePromises = fileIds.map(async (fileId) => {
-      return await fileService.update(fileId, {
+    // Get all files with their current tags
+    const files = await Promise.all(
+      fileIds.map(fileId => fileService.findById(fileId))
+    );
+
+    // Update each file individually, only connecting tags that aren't already present
+    const updatePromises = files.map(async (file) => {
+      if (!file) return null;
+      
+      // Get existing tag names
+      const existingTagNames = file.tags.map(tag => tag.name);
+      
+      // Filter out tags that are already present
+      const newTags = tagNames.filter(tagName => !existingTagNames.includes(tagName));
+      
+      if (newTags.length === 0) return file;
+
+      return await fileService.update(file.id, {
         tags: {
-          set: [],
-          ...(tagNames.length > 0 && {
-            connect: tagNames.map(name => ({ name }))
-          })
+          connect: newTags.map(name => ({ name }))
         }
       });
     });

@@ -304,9 +304,8 @@ const FolderPageClient = ({ data }: { data: FolderWithChildren }) => {
                   <SelectItem 
                     key={tag.id} 
                     value={tag.name}
-                    disabled={existingTags.includes(tag.name)}
                   >
-                    {tag.name} {existingTags.includes(tag.name) && '(already assigned)'}
+                    {tag.name}
                   </SelectItem>
                 ))}
               </SelectContent>
