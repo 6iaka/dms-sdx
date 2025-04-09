@@ -202,14 +202,14 @@ export const updateFile = async (id: number, data: {
   }
 };
 
-export async function getFilesByTag(tagIdOrName: string) {
+export async function getFilesByTag(tagName: string) {
   try {
     const user = await currentUser();
     if (!user) {
       throw new Error("Unauthorized");
     }
 
-    const files = await fileService.findByTag(tagIdOrName, user.id);
+    const files = await fileService.findByTag(tagName);
     return files;
   } catch (error) {
     console.error("Error in getFilesByTag:", error);

@@ -7,7 +7,8 @@ import { deleteFolder, toggleFolderFavorite } from "~/server/actions/folder_acti
 import EditFolderForm from "./forms/EditFolderForm";
 import { Button } from "./ui/button";
 import { useToast } from "~/hooks/use-toast";
-import { useRouter } from "next/navigation";
+import { useQueryClient } from "@tanstack/react-query";
+import { useTransition } from "react";
 
 import {
   DropdownMenu,
@@ -15,51 +16,51 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "./ui/dropdown-menu";
-import { useTransition } from "react";
 
 type Props = { data: Folder };
 
 const FolderCard = ({ data }: Props) => {
   const { toast } = useToast();
   const [isPending, startTransition] = useTransition();
-  const router = useRouter();
+  const queryClient = useQueryClient();
+
+  const handleDelete = async () => {
+    try {
+      await deleteFolder(data.id);
+      toast({
+        title: "Success",
+        description: "Folder deleted successfully",
+      });
+      // Invalidate all relevant queries
+      await queryClient.invalidateQueries({ queryKey: ["folders"] });
+      await queryClient.invalidateQueries({ queryKey: ["files"] });
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Failed to delete folder",
+        variant: "destructive",
+      });
+    }
+  };
 
   const handleToggleFavorite = async () => {
-    startTransition(async () => {
+    try {
       const result = await toggleFolderFavorite(data.id);
       if (result.success) {
         toast({
           title: "Success",
           description: result.message,
         });
-      } else {
-        toast({
-          title: "Error",
-          description: result.message,
-          variant: "destructive",
-        });
+        // Invalidate the folders query to update the UI
+        await queryClient.invalidateQueries({ queryKey: ["folders"] });
       }
-    });
-  };
-
-  const handleDelete = async () => {
-    startTransition(async () => {
-      const result = await deleteFolder(data.id);
-      if (result.success) {
-        toast({
-          title: "Success",
-          description: result.message,
-        });
-        // Refresh the current page
-        router.refresh();
-      } else {
-        toast({
-          title: "Error",
-          description: result.message,
-          variant: "destructive",
-        });
-      }
-    });
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Failed to update favorite status",
+        variant: "destructive",
+      });
+    }
   };
 
   return (
@@ -131,7 +132,7 @@ const FolderCard = ({ data }: Props) => {
             </DropdownMenuItem>
 
             <DropdownMenuItem
-              onSelect={handleDelete}
+              onSelect={() => startTransition(handleDelete)}
               className="flex items-center gap-2"
             >
               <Trash className="h-4 w-4" />

@@ -135,14 +135,8 @@ export const deleteFolder = async (id: number) => {
       const children = await folderService.findMany({ parentId: folderId });
       for (const child of children) {
         await deleteChildren(child.id);
-        try {
-          // Try to delete from Google Drive first
-          await driveService.deleteItem(child.googleId);
-        } catch {
-          // If the item doesn't exist in Drive, just log it and continue
-          console.log(`Item ${child.googleId} not found in Drive, proceeding with database deletion`);
-        }
         await folderService.delete(child.id);
+        await driveService.deleteItem(child.googleId);
       }
     };
 
@@ -150,30 +144,13 @@ export const deleteFolder = async (id: number) => {
     await deleteChildren(id);
 
     // Then delete the parent folder
-    try {
-      // Try to delete from Google Drive first
-      await driveService.deleteItem(folder.googleId);
-    } catch {
-      // If the item doesn't exist in Drive, just log it and continue
-      console.log(`Item ${folder.googleId} not found in Drive, proceeding with database deletion`);
-    }
-    await folderService.delete(id);
+    const deletedFolder = await folderService.delete(id);
+    await driveService.deleteItem(deletedFolder.googleId);
 
-    // Revalidate all relevant paths
     revalidatePath("/");
     revalidatePath("/folder/:id", "page");
-    revalidatePath("/folder/[id]", "page");
-    
-    return {
-      success: true,
-      message: "Folder deleted successfully"
-    };
   } catch (error) {
     console.error(error);
-    return {
-      success: false,
-      message: error instanceof Error ? error.message : "Failed to delete folder"
-    };
   }
 };
 

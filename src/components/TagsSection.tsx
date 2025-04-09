@@ -1,7 +1,7 @@
 "use client";
 
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { MoreVertical, Tag as TagIcon, Trash2, Pencil, Loader2 } from "lucide-react";
+import { MoreVertical, Tag, Trash2, Pencil, Loader2 } from "lucide-react";
 import { useState } from "react";
 import { Button } from "~/components/ui/button";
 import {
@@ -27,19 +27,10 @@ import {
 } from "~/components/ui/dropdown-menu";
 import { Input } from "~/components/ui/input";
 import { Label } from "~/components/ui/label";
-import type { File, Tag } from "@prisma/client";
-
-type FileWithTags = File & {
-  tags: Tag[];
-  folder?: {
-    id: number;
-    title: string;
-  } | null;
-};
 
 const TagsSection = () => {
-  const [selectedTags, setSelectedTags] = useState<Set<number>>(new Set());
-  const [tagToDelete, setTagToDelete] = useState<number | null>(null);
+  const [selectedTags, setSelectedTags] = useState<Set<string>>(new Set());
+  const [tagToDelete, setTagToDelete] = useState<string | null>(null);
   const [tagToEdit, setTagToEdit] = useState<{ id: number; name: string } | null>(null);
   const [newTagName, setNewTagName] = useState("");
   const [searchQuery, setSearchQuery] = useState("");
@@ -66,7 +57,7 @@ const TagsSection = () => {
       if (selectedTags.size === 0) return [];
       try {
         const results = await Promise.all(
-          Array.from(selectedTags).map(tagId => getFilesByTag(tagId.toString()))
+          Array.from(selectedTags).map(tag => getFilesByTag(tag))
         );
         // Merge all files and remove duplicates based on id
         const uniqueFiles = results.flat().reduce((acc, file) => {
@@ -74,7 +65,7 @@ const TagsSection = () => {
             acc.push(file);
           }
           return acc;
-        }, [] as FileWithTags[]);
+        }, [] as any[]);
         return uniqueFiles;
       } catch {
         return [];
@@ -84,13 +75,13 @@ const TagsSection = () => {
   });
 
   // Handle tag selection
-  const handleTagSelect = (tagId: number) => {
+  const handleTagSelect = (tagName: string) => {
     setSelectedTags(prev => {
       const next = new Set(prev);
-      if (next.has(tagId)) {
-        next.delete(tagId);
+      if (next.has(tagName)) {
+        next.delete(tagName);
       } else {
-        next.add(tagId);
+        next.add(tagName);
       }
       return next;
     });
@@ -100,7 +91,7 @@ const TagsSection = () => {
   const handleDelete = async () => {
     if (!tagToDelete) return;
     try {
-      const response = await deleteTag(tagToDelete.toString());
+      const response = await deleteTag(tagToDelete);
       if (response) {
         toast({ title: "Tag deleted successfully" });
         setTagToDelete(null);
@@ -136,9 +127,9 @@ const TagsSection = () => {
         setNewTagName("");
         setSelectedTags(prev => {
           const next = new Set(prev);
-          if (next.has(tagToEdit.id)) {
-            next.delete(tagToEdit.id);
-            next.add(tagToEdit.id);
+          if (next.has(tagToEdit.name)) {
+            next.delete(tagToEdit.name);
+            next.add(newTagName);
           }
           return next;
         });
@@ -162,14 +153,14 @@ const TagsSection = () => {
     <Dialog>
       <DialogTrigger asChild>
         <Button variant="ghost" size="icon" className="rounded-full">
-          <TagIcon className="h-4 w-4" />
+          <Tag className="h-5 w-5" />
         </Button>
       </DialogTrigger>
       <DialogContent className="sm:max-w-[800px]">
         <DialogHeader>
           <DialogTitle>Tags</DialogTitle>
         </DialogHeader>
-        <div className="flex flex-col gap-4">
+        <div className="flex h-[600px] flex-col gap-4">
           {/* Search Input */}
           <div className="flex items-center gap-2">
             <Input
@@ -185,12 +176,12 @@ const TagsSection = () => {
             {sortedAndFilteredTags?.map((tag) => (
               <Badge
                 key={tag.id}
-                variant={selectedTags.has(tag.id) ? "default" : "secondary"}
+                variant={selectedTags.has(tag.name) ? "default" : "secondary"}
                 className="flex cursor-pointer items-center justify-between rounded-full px-3 py-1"
                 onClick={(e) => {
                   e.preventDefault();
                   e.stopPropagation();
-                  handleTagSelect(tag.id);
+                  handleTagSelect(tag.name);
                 }}
               >
                 <span className="flex-1">
@@ -229,7 +220,7 @@ const TagsSection = () => {
                         className="text-destructive focus:text-destructive"
                         onClick={(e) => {
                           e.stopPropagation();
-                          setTagToDelete(tag.id);
+                          setTagToDelete(tag.name);
                         }}
                       >
                         <Trash2 className="mr-2 size-4" />
@@ -244,28 +235,27 @@ const TagsSection = () => {
 
           {/* Files Section */}
           {selectedTags.size > 0 && (
-            <div className="flex flex-col gap-2">
+            <div className="flex flex-1 flex-col gap-2 overflow-hidden">
               <h3 className="text-balance font-medium">
-                Files with tags: {Array.from(selectedTags).map((tagId, index) => {
-                  const tag = tags?.find(t => t.id === tagId);
-                  return (
-                    <span key={tagId}>
-                      &quot;{tag?.name}&quot;
-                      {index < selectedTags.size - 1 ? ", " : ""}
-                    </span>
-                  );
-                })}
+                Files with tags: {Array.from(selectedTags).map((tag, index) => (
+                  <span key={tag}>
+                    &quot;{tag}&quot;
+                    {index < selectedTags.size - 1 ? ", " : ""}
+                  </span>
+                ))}
               </h3>
-              <div className="grid w-full grid-cols-[repeat(auto-fill,minmax(9rem,1fr))] gap-2">
-                {isLoading ? (
-                  <div className="col-span-full flex justify-center py-8">
-                    <Loader2 className="h-8 w-8 animate-spin" />
-                  </div>
-                ) : files && files.length > 0 ? (
-                  files.map((file: FileWithTags) => <FileCard data={file} key={file.id} />)
-                ) : (
-                  <p className="text-sm text-muted-foreground">No files with these tags</p>
-                )}
+              <div className="flex-1 overflow-y-auto">
+                <div className="grid w-full grid-cols-[repeat(auto-fill,minmax(9rem,1fr))] gap-2">
+                  {isLoading ? (
+                    <div className="col-span-full flex justify-center py-8">
+                      <Loader2 className="h-8 w-8 animate-spin" />
+                    </div>
+                  ) : files && files.length > 0 ? (
+                    files.map((file) => <FileCard data={file} key={file.id} />)
+                  ) : (
+                    <p className="text-sm text-muted-foreground">No files with these tags</p>
+                  )}
+                </div>
               </div>
             </div>
           )}

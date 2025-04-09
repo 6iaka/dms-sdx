@@ -49,6 +49,7 @@ const FileUploadForm = ({ folderId }: Props) => {
   const [isOpen, setIsOpen] = useState(false);
   const queryClient = useQueryClient();
   const [selectedTags, setSelectedTags] = useState<string[]>([]);
+  const [isLoading, setIsLoading] = useState(false);
 
   const { data: tags } = useQuery({
     queryKey: ["tags"],
@@ -59,6 +60,29 @@ const FileUploadForm = ({ folderId }: Props) => {
     resolver: zodResolver(formSchema),
     defaultValues: { tagNames: [] },
   });
+
+  const handleExternalDrop = async (url: string) => {
+    try {
+      setIsLoading(true);
+      const response = await fetch(url);
+      const blob = await response.blob();
+      const fileName = url.split('/').pop() || 'downloaded-file';
+      const file = new File([blob], fileName, { type: blob.type });
+      form.setValue("file", file);
+      toast({
+        title: "Success",
+        description: "File downloaded successfully",
+      });
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Failed to download file",
+        variant: "destructive",
+      });
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
   const onSubmit = async (values: z.infer<typeof formSchema>) => {
     const response = await uploadFile({
@@ -78,7 +102,6 @@ const FileUploadForm = ({ folderId }: Props) => {
       form.reset();
       setSelectedTags([]);
       setIsOpen(false);
-      // Invalidate both files and tags queries to refresh the data
       await queryClient.invalidateQueries({ queryKey: ["files"] });
       await queryClient.invalidateQueries({ queryKey: ["tags"] });
     }
@@ -108,24 +131,45 @@ const FileUploadForm = ({ folderId }: Props) => {
                 <FormItem className="flex flex-col">
                   <FormLabel>File</FormLabel>
                   <FormControl>
-                    <Dropzone
-                      onDrop={(files: File[]) => {
-                        if (files[0]) {
-                          onChange(files[0]);
-                          form.setValue("file", files[0]);
+                    <div
+                      className="flex flex-col items-center justify-center gap-2 rounded-lg border border-dashed p-4"
+                      onDragOver={(e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                      }}
+                      onDrop={async (e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        
+                        // Handle file drops
+                        if (e.dataTransfer.files.length > 0) {
+                          const file = e.dataTransfer.files[0];
+                          onChange(file);
+                          form.setValue("file", file);
+                          return;
+                        }
+
+                        // Handle URL drops
+                        const url = e.dataTransfer.getData('text/uri-list') || e.dataTransfer.getData('text/plain');
+                        if (url && (url.startsWith('http://') || url.startsWith('https://'))) {
+                          await handleExternalDrop(url);
                         }
                       }}
-                      {...field}
                     >
-                      {() => (
-                        <div className="flex flex-col items-center justify-center gap-2 rounded-lg border border-dashed p-4">
+                      {isLoading ? (
+                        <div className="flex items-center gap-2">
+                          <Loader2 className="size-8 animate-spin text-muted-foreground" />
+                          <p className="text-sm text-muted-foreground">Downloading file...</p>
+                        </div>
+                      ) : (
+                        <>
                           <FileCheck className="size-8 text-muted-foreground" />
                           <p className="text-sm text-muted-foreground">
-                            {value?.name || "Drop a file here"}
+                            {value?.name || "Drop a file or URL here"}
                           </p>
-                        </div>
+                        </>
                       )}
-                    </Dropzone>
+                    </div>
                   </FormControl>
                   <FormMessage />
                 </FormItem>
@@ -164,7 +208,7 @@ const FileUploadForm = ({ folderId }: Props) => {
                     {selectedTags.length > 0 && (
                       <div className="mt-2 flex flex-wrap gap-2">
                         {selectedTags.map((tag) => (
-                          <div
+                          <span
                             key={tag}
                             className="flex items-center gap-1 rounded-full bg-primary/10 px-2 py-1 text-xs"
                           >
@@ -180,7 +224,7 @@ const FileUploadForm = ({ folderId }: Props) => {
                             >
                               ×
                             </button>
-                          </div>
+                          </span>
                         ))}
                       </div>
                     )}

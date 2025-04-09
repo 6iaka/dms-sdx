@@ -1,6 +1,6 @@
 "server only";
 
-import { Prisma } from "@prisma/client";
+import type { File as FileData, Prisma } from "@prisma/client";
 import { db } from "../db";
 
 export class FileService {
@@ -69,28 +69,31 @@ export class FileService {
   };
 
   /**
-   * Get files by tag name or ID
-   * @param tagIdOrName ID or name of the tag to filter by
-   * @param isId Whether the input is a tag ID
+   * Get files by tag name
+   * @param tagName Name of the tag to filter by
    * @returns Array of files with the specified tag
    */
-  findByTag = async (tagId: number | string, userId: string) => {
-    const whereClause: Prisma.FileWhereInput = {
-      userClerkId: userId,
-      tags: {
-        some: {
-          id: typeof tagId === "number" ? tagId : undefined,
-          name: typeof tagId === "string" ? tagId : undefined,
+  findByTag = async (tagName: string) => {
+    try {
+      const files = await db.file.findMany({
+        where: {
+          tags: {
+            some: {
+              name: tagName
+            }
+          }
         },
-      },
-    };
-
-    return db.file.findMany({
-      where: whereClause,
-      include: {
-        tags: true,
-      },
-    });
+        include: {
+          tags: true,
+          folder: true,
+        },
+        orderBy: { createdAt: "desc" },
+      });
+      return files;
+    } catch (error) {
+      console.error("Error in findByTag:", error);
+      throw new Error((error as Error).message);
+    }
   };
 
   /**

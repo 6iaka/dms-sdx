@@ -1,44 +1,40 @@
 "use client";
-import type { File, Tag } from "@prisma/client";
-import { useRouter } from "next/navigation";
-import { Button } from "./ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "./ui/card";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "./ui/dialog";
-import { Trash2 } from "lucide-react";
-import { deleteFile } from "~/server/actions/file_action";
-import { toast } from "sonner";
-import { EllipsisVertical } from "lucide-react";
+import type { File as FileData, Tag } from "@prisma/client";
+import { EllipsisVertical, Trash } from "lucide-react";
 import Image from "next/image";
-import { useTransition } from "react";
-import { useQueryClient } from "@tanstack/react-query";
-import { cn, formatFileSize } from "~/lib/utils";
+import { useState, useTransition } from "react";
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "~/components/ui/dropdown-menu";
+import { cn, formatFileSize } from "~/lib/utils";
+import { deleteFile } from "~/server/actions/file_action";
+import { Button } from "./ui/button";
 import EditFileForm from "./forms/EditFileForm";
+import { useToast } from "~/hooks/use-toast";
+import { useQueryClient } from "@tanstack/react-query";
 
 type Props = { 
-  data: File & {
+  data: FileData & {
     tags: Tag[];
   };
   isSelecting?: boolean;
   isSelected?: boolean;
-  onSelect?: (fileId: number) => void;
+  onSelect?: (selected: boolean) => void;
 };
 
 const FileCard = ({ data, isSelecting, isSelected, onSelect }: Props) => {
   const [isPending, startTransition] = useTransition();
+  const { toast } = useToast();
   const queryClient = useQueryClient();
-  const router = useRouter();
 
   const handleClick = (e: React.MouseEvent) => {
     if (isSelecting && onSelect) {
       e.preventDefault();
       e.stopPropagation();
-      onSelect(data.id);
+      onSelect(!isSelected);
     }
   };
 
@@ -46,14 +42,21 @@ const FileCard = ({ data, isSelecting, isSelected, onSelect }: Props) => {
     try {
       const result = await deleteFile(data.id);
       if (result) {
-        toast.success("File deleted successfully");
+        toast({
+          title: "Success",
+          description: "File deleted successfully",
+        });
         await queryClient.invalidateQueries({ queryKey: ["files"] });
       } else {
         throw new Error("Failed to delete file");
       }
     } catch (error) {
       console.error("Error deleting file:", error);
-      toast.error(error instanceof Error ? error.message : "Failed to delete file");
+      toast({
+        title: "Error",
+        description: error instanceof Error ? error.message : "Failed to delete file",
+        variant: "destructive",
+      });
     }
   };
 
@@ -69,31 +72,48 @@ const FileCard = ({ data, isSelecting, isSelected, onSelect }: Props) => {
       )}
       onDoubleClick={() => (window.location.href = data.webViewLink)}
     >
-      <div className="relative aspect-square w-full overflow-hidden rounded-lg">
-        {data.mimeType?.startsWith('image/') && data.thumbnailLink ? (
-          <div className="relative w-full h-48">
-            <Image
-              src={data.thumbnailLink}
-              alt={data.title}
-              fill
-              className="object-cover rounded-t-lg"
-            />
+      <div className="relative aspect-square w-full overflow-hidden rounded-lg bg-muted">
+        {data.mimeType?.startsWith('image/') ? (
+          <img
+            src={data.thumbnailLink || data.webContentLink}
+            alt={data.title}
+            className="h-full w-full object-cover"
+            onError={(e) => {
+              const target = e.target as HTMLImageElement;
+              target.style.display = 'none';
+              const fallback = document.createElement('div');
+              fallback.className = 'flex h-full items-center justify-center';
+              fallback.innerHTML = '<span class="text-4xl">🖼️</span>';
+              target.parentNode?.appendChild(fallback);
+            }}
+          />
+        ) : data.mimeType?.startsWith('video/') ? (
+          <div className="flex h-full items-center justify-center">
+            <span className="text-4xl">🎬</span>
           </div>
-        ) : data.iconLink ? (
-          <div className="flex items-center justify-center h-48 bg-gray-100 rounded-t-lg">
-            <Image
-              src={data.iconLink.replace("16", "64")}
-              alt={data.title}
-              width={64}
-              height={64}
-              className="object-contain"
-            />
+        ) : data.mimeType?.startsWith('audio/') ? (
+          <div className="flex h-full items-center justify-center">
+            <span className="text-4xl">🎵</span>
+          </div>
+        ) : data.mimeType?.includes('pdf') ? (
+          <div className="flex h-full items-center justify-center">
+            <span className="text-4xl">📄</span>
+          </div>
+        ) : data.mimeType?.includes('word') || data.mimeType?.includes('document') ? (
+          <div className="flex h-full items-center justify-center">
+            <span className="text-4xl">📝</span>
+          </div>
+        ) : data.mimeType?.includes('spreadsheet') || data.mimeType?.includes('excel') ? (
+          <div className="flex h-full items-center justify-center">
+            <span className="text-4xl">📊</span>
+          </div>
+        ) : data.mimeType?.includes('presentation') || data.mimeType?.includes('powerpoint') ? (
+          <div className="flex h-full items-center justify-center">
+            <span className="text-4xl">📑</span>
           </div>
         ) : (
-          <div className="flex items-center justify-center h-48 bg-gray-100 rounded-t-lg">
-            <span className="text-2xl font-bold text-gray-500">
-              {data.title.split('.').pop()?.toUpperCase()}
-            </span>
+          <div className="flex h-full items-center justify-center">
+            <span className="text-4xl">📁</span>
           </div>
         )}
         {isSelecting && (
@@ -137,7 +157,7 @@ const FileCard = ({ data, isSelecting, isSelected, onSelect }: Props) => {
                 startTransition(handleDelete);
               }}
             >
-              <Trash2 className="h-4 w-4" />
+              <Trash className="h-4 w-4" />
               <span>Delete</span>
             </DropdownMenuItem>
           </DropdownMenuContent>
