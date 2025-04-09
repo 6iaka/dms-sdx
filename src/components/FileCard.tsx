@@ -47,16 +47,12 @@ const FileCard = ({ data, isSelecting, isSelected, onSelect }: Props) => {
 
   const handleDelete = async () => {
     try {
-      const result = await deleteFile(data.id);
-      if (result) {
-        toast({
-          title: "Success",
-          description: "File deleted successfully",
-        });
-        await queryClient.invalidateQueries({ queryKey: ["files"] });
-      } else {
-        throw new Error("Failed to delete file");
-      }
+      await deleteFile(data.id);
+      toast({
+        title: "Success",
+        description: "File deleted successfully",
+      });
+      await queryClient.invalidateQueries({ queryKey: ["files"] });
     } catch (error) {
       console.error("Error deleting file:", error);
       toast({

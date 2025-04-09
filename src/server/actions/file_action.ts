@@ -143,7 +143,13 @@ export const deleteFile = async (id: number) => {
 
   try {
     if (!user) throw new Error("Not authorized");
+    
+    const file = await fileService.findById(id);
+    if (!file) throw new Error("File not found");
+
     const deletedFile = await fileService.delete(id);
+    if (!deletedFile) throw new Error("Failed to delete file from database");
+
     await driveService.deleteItem(deletedFile.googleId);
 
     revalidatePath("/");
@@ -151,7 +157,8 @@ export const deleteFile = async (id: number) => {
 
     return deletedFile;
   } catch (error) {
-    console.error((error as Error).message);
+    console.error("Error deleting file:", error);
+    throw error;
   }
 };
 
