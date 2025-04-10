@@ -2,10 +2,10 @@
 
 import { currentUser } from "@clerk/nextjs/server";
 import { revalidatePath } from "next/cache";
+import { getCategoryFromMimeType } from "~/lib/utils";
 import driveService from "../services/drive_service";
 import fileService from "../services/file_service";
 import folderService from "../services/folder_service";
-import { getCategoryFromMimeType } from "~/lib/utils";
 
 export const getFiles = async (folderId: number) => {
   const user = await currentUser();
@@ -90,8 +90,8 @@ export const uploadFile = async (payload: UploadType) => {
     const newFile = await fileService.upsert({
       ...(payload.tagNames && {
         tags: {
-          connect: payload.tagNames.map(name => ({ name }))
-        }
+          connect: payload.tagNames.map((name) => ({ name })),
+        },
       }),
       iconLink: driveFile.iconLink!.replace("16", "64"),
       folder: { connect: { googleId: folderId } },
@@ -143,7 +143,7 @@ export const deleteFile = async (id: number) => {
 
   try {
     if (!user) throw new Error("Not authorized");
-    
+
     const file = await fileService.findById(id);
     if (!file) throw new Error("File not found");
 
@@ -169,40 +169,43 @@ export const deleteFile = async (id: number) => {
   }
 };
 
-export const searchFile = async (query: string) => {
-  try {
-    const results = await fileService.search({
-      text: query,
-      type: "",
-      name: query,
-      tag: ""
-    });
-    return results;
-  } catch (error) {
-    console.error((error as Error).message);
-  }
-};
+// export const searchFile = async (
+//   query: string,
+//   category?: Category,
+//   tags?: string[],
+// ) => {
+//   try {
+//     const results = await fileService.search(query, category, tags);
+//     return results;
+//   } catch (error) {
+//     console.error((error as Error).message);
+//   }
+// };
 
-export const updateFile = async (id: number, data: { 
-  title?: string; 
-  tagNames?: string[];
-  description?: string;
-}) => {
+export const updateFile = async (
+  id: number,
+  data: {
+    title?: string;
+    tagNames?: string[];
+    description?: string;
+  },
+) => {
   const user = await currentUser();
 
   try {
     if (!user) throw new Error("Not authorized");
-    
+
     // Update file with all changes at once
     const updated = await fileService.update(id, {
       ...(data.title && { title: data.title }),
       ...(data.description && { description: data.description }),
       tags: {
         set: [],
-        ...(data.tagNames && data.tagNames.length > 0 && {
-          connect: data.tagNames.map(name => ({ name }))
-        })
-      }
+        ...(data.tagNames &&
+          data.tagNames.length > 0 && {
+            connect: data.tagNames.map((name) => ({ name })),
+          }),
+      },
     });
 
     revalidatePath("/");
@@ -212,7 +215,9 @@ export const updateFile = async (id: number, data: {
     return updated;
   } catch (error) {
     console.error("Error updating file:", error);
-    throw new Error(error instanceof Error ? error.message : "Failed to update file");
+    throw new Error(
+      error instanceof Error ? error.message : "Failed to update file",
+    );
   }
 };
 
@@ -245,25 +250,27 @@ export const assignTagToFiles = async ({
 
     // Get all files with their current tags
     const files = await Promise.all(
-      fileIds.map(fileId => fileService.findById(fileId))
+      fileIds.map((fileId) => fileService.findById(fileId)),
     );
 
     // Update each file individually, only connecting tags that aren't already present
     const updatePromises = files.map(async (file) => {
       if (!file) return null;
-      
+
       // Get existing tag names
-      const existingTagNames = file.tags.map(tag => tag.name);
-      
+      const existingTagNames = file.tags.map((tag) => tag.name);
+
       // Filter out tags that are already present
-      const newTags = tagNames.filter(tagName => !existingTagNames.includes(tagName));
-      
+      const newTags = tagNames.filter(
+        (tagName) => !existingTagNames.includes(tagName),
+      );
+
       if (newTags.length === 0) return file;
 
       return await fileService.update(file.id, {
         tags: {
-          connect: newTags.map(name => ({ name }))
-        }
+          connect: newTags.map((name) => ({ name })),
+        },
       });
     });
 
@@ -276,7 +283,9 @@ export const assignTagToFiles = async ({
     return true;
   } catch (error) {
     console.error("Error assigning tags:", error);
-    throw new Error(error instanceof Error ? error.message : "Failed to assign tags");
+    throw new Error(
+      error instanceof Error ? error.message : "Failed to assign tags",
+    );
   }
 };
 
@@ -291,7 +300,7 @@ export const moveFiles = async ({
 
   try {
     if (!user) throw new Error("Not authorized");
-    
+
     const updated = await fileService.move(fileIds, targetFolderId);
 
     revalidatePath("/");

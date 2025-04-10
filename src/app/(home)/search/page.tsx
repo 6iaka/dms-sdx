@@ -1,3 +1,4 @@
+import { type Category } from "@prisma/client";
 import FileCard from "~/components/FileCard";
 import FolderCard from "~/components/FolderCard";
 import fileService from "~/server/services/file_service";
@@ -6,25 +7,20 @@ import folderService from "~/server/services/folder_service";
 type Props = {
   searchParams: Promise<{
     query?: string;
-    type?: string;
-    name?: string;
-    tag?: string | string[];
+    category?: string;
+    tags?: string;
   }>;
 };
 
 const SearchPage = async ({ searchParams }: Props) => {
   const params = await searchParams;
-  const { query, type, name, tag } = params;
+  const { query, category, tags } = params;
 
-  // Build search query
-  const searchQuery = {
-    text: query || "",
-    type: type || "",
-    name: name || "",
-    tag: tag || "",
-  };
-
-  const files = await fileService.search(searchQuery);
+  const files = await fileService.search({
+    query: query || "",
+    ...(category && { category: category as Category }),
+    ...(tags && { tags: tags?.split(",") }),
+  });
   const folders = await folderService.search(query || "");
 
   return (

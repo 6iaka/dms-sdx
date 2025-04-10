@@ -1,29 +1,22 @@
 "use client";
 import type { File as FileData, Tag } from "@prisma/client";
+import { useQueryClient } from "@tanstack/react-query";
 import { EllipsisVertical, Trash } from "lucide-react";
-import Image from "next/image";
-import { useState, useTransition } from "react";
+import { useTransition } from "react";
+import { Button } from "~/components/ui/button";
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "~/components/ui/dropdown-menu";
+import { useToast } from "~/hooks/use-toast";
 import { cn, formatFileSize } from "~/lib/utils";
 import { deleteFile } from "~/server/actions/file_action";
-import { Button } from "~/components/ui/button";
 import EditFileForm from "./forms/EditFileForm";
-import { useToast } from "~/hooks/use-toast";
-import { useQueryClient } from "@tanstack/react-query";
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-} from "~/components/ui/dialog";
+import Image from "next/image";
 
-type Props = { 
+type Props = {
   data: FileData & {
     tags: Tag[];
   };
@@ -55,13 +48,15 @@ const FileCard = ({ data, isSelecting, isSelected, onSelect }: Props) => {
       await queryClient.invalidateQueries({ queryKey: ["files"] });
     } catch (error) {
       console.error("Error deleting file:", error);
-      const errorMessage = error instanceof Error ? error.message : "Failed to delete file";
-      
+      const errorMessage =
+        error instanceof Error ? error.message : "Failed to delete file";
+
       // Handle specific error cases
       if (errorMessage.includes("File not found")) {
         toast({
           title: "Error",
-          description: "The file could not be found. It may have been already deleted.",
+          description:
+            "The file could not be found. It may have been already deleted.",
           variant: "destructive",
         });
       } else if (errorMessage.includes("permissions")) {
@@ -88,46 +83,51 @@ const FileCard = ({ data, isSelecting, isSelected, onSelect }: Props) => {
         "group relative flex flex-col gap-2 rounded-lg bg-card p-2 transition-all hover:bg-secondary/25",
         isPending && "pointer-events-none opacity-20",
         isSelecting && "cursor-pointer",
-        isSelected && "bg-primary/10 hover:bg-primary/20"
+        isSelected && "bg-primary/10 hover:bg-primary/20",
       )}
       onDoubleClick={() => (window.location.href = data.webViewLink)}
     >
       <div className="relative aspect-square w-full overflow-hidden rounded-lg bg-muted">
-        {data.mimeType?.startsWith('image/') ? (
-          <img
+        {data.mimeType?.startsWith("image/") ? (
+          <Image
             src={data.thumbnailLink || data.webContentLink}
             alt={data.title}
+            width={500}
+            height={500}
             className="h-full w-full object-cover"
             onError={(e) => {
               const target = e.target as HTMLImageElement;
-              target.style.display = 'none';
-              const fallback = document.createElement('div');
-              fallback.className = 'flex h-full items-center justify-center';
+              target.style.display = "none";
+              const fallback = document.createElement("div");
+              fallback.className = "flex h-full items-center justify-center";
               fallback.innerHTML = '<span class="text-4xl">🖼️</span>';
               target.parentNode?.appendChild(fallback);
             }}
           />
-        ) : data.mimeType?.startsWith('video/') ? (
+        ) : data.mimeType?.startsWith("video/") ? (
           <div className="flex h-full items-center justify-center">
             <span className="text-4xl">🎬</span>
           </div>
-        ) : data.mimeType?.startsWith('audio/') ? (
+        ) : data.mimeType?.startsWith("audio/") ? (
           <div className="flex h-full items-center justify-center">
             <span className="text-4xl">🎵</span>
           </div>
-        ) : data.mimeType?.includes('pdf') ? (
+        ) : data.mimeType?.includes("pdf") ? (
           <div className="flex h-full items-center justify-center">
             <span className="text-4xl">📄</span>
           </div>
-        ) : data.mimeType?.includes('word') || data.mimeType?.includes('document') ? (
+        ) : data.mimeType?.includes("word") ||
+          data.mimeType?.includes("document") ? (
           <div className="flex h-full items-center justify-center">
             <span className="text-4xl">📝</span>
           </div>
-        ) : data.mimeType?.includes('spreadsheet') || data.mimeType?.includes('excel') ? (
+        ) : data.mimeType?.includes("spreadsheet") ||
+          data.mimeType?.includes("excel") ? (
           <div className="flex h-full items-center justify-center">
             <span className="text-4xl">📊</span>
           </div>
-        ) : data.mimeType?.includes('presentation') || data.mimeType?.includes('powerpoint') ? (
+        ) : data.mimeType?.includes("presentation") ||
+          data.mimeType?.includes("powerpoint") ? (
           <div className="flex h-full items-center justify-center">
             <span className="text-4xl">📑</span>
           </div>
@@ -138,10 +138,12 @@ const FileCard = ({ data, isSelecting, isSelected, onSelect }: Props) => {
         )}
         {isSelecting && (
           <div className="absolute inset-0 flex items-center justify-center bg-black/50">
-            <div className={cn(
-              "size-6 rounded-full border-2",
-              isSelected ? "border-primary bg-primary" : "border-white"
-            )} />
+            <div
+              className={cn(
+                "size-6 rounded-full border-2",
+                isSelected ? "border-primary bg-primary" : "border-white",
+              )}
+            />
           </div>
         )}
       </div>

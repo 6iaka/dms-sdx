@@ -1,6 +1,6 @@
 "server only";
 
-import type { File as FileData, Prisma } from "@prisma/client";
+import type { Category, Prisma } from "@prisma/client";
 import { db } from "../db";
 
 export class FileService {
@@ -53,8 +53,8 @@ export class FileService {
       const files = await db.file.findMany({
         where: {
           folder: {
-            id: folderId
-          }
+            id: folderId,
+          },
         },
         include: {
           tags: true,
@@ -79,9 +79,9 @@ export class FileService {
         where: {
           tags: {
             some: {
-              name: tagName
-            }
-          }
+              name: tagName,
+            },
+          },
         },
         include: {
           tags: true,
@@ -115,62 +115,44 @@ export class FileService {
    * @param query Search parameters including text, type, name, and tag
    * @returns Array of results based on the query
    */
-  search = async (query: {
-    text: string;
-    type: string;
-    name: string;
-    tag: string | string[];
+  search = async ({
+    query,
+    category,
+    tags,
+  }: {
+    query: string;
+    category?: Category;
+    tags?: string[];
   }) => {
     try {
-      const whereClause: Prisma.FileWhereInput = {};
-
-      // Text search across title, filename, and description
-      if (query.text) {
-        whereClause.OR = [
-          { title: { contains: query.text, mode: "insensitive" } },
-          { originalFilename: { contains: query.text, mode: "insensitive" } },
-          { description: { contains: query.text, mode: "insensitive" } },
-        ];
-      }
-
-      // File type filter
-      if (query.type) {
-        whereClause.mimeType = { contains: query.type, mode: "insensitive" };
-      }
-
-      // Name filter
-      if (query.name) {
-        whereClause.OR = [
-          ...(whereClause.OR || []),
-          { title: { contains: query.name, mode: "insensitive" } },
-          { originalFilename: { contains: query.name, mode: "insensitive" } },
-        ];
-      }
-
-      // Tag filter - handle both single tag and multiple tags
-      if (query.tag) {
-        const tags = Array.isArray(query.tag) ? query.tag : [query.tag];
-        whereClause.tags = {
-          every: {
-            name: {
-              in: tags
-            }
-          }
-        };
-      }
-
-      const results = await db.file.findMany({
-        where: whereClause,
-        include: {
-          tags: true,
-          folder: true,
+      const files = await db.file.findMany({
+        where: {
+          AND: [
+            {
+              OR: [
+                { title: { contains: query, mode: "insensitive" } },
+                { originalFilename: { contains: query, mode: "insensitive" } },
+                { description: { contains: query, mode: "insensitive" } },
+              ],
+            },
+            category ? { categeory: category } : {},
+            tags && tags.length > 0
+              ? {
+                  tags: {
+                    some: {
+                      name: { in: tags },
+                    },
+                  },
+                }
+              : {},
+          ],
         },
-        orderBy: { createdAt: "desc" },
+        orderBy: { updatedAt: "desc" },
+        take: 40,
+        include: { tags: true },
       });
-
-      return results;
+      return files;
     } catch (error) {
-      console.error("Error in search:", error);
       throw new Error((error as Error).message);
     }
   };

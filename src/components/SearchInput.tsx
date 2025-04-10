@@ -1,7 +1,9 @@
 "use client";
-import { Search, SlidersHorizontal, X } from "lucide-react";
+import { useQuery } from "@tanstack/react-query";
+import { Search, SlidersHorizontal } from "lucide-react";
+import { useRouter, useSearchParams } from "next/navigation";
+import { useState } from "react";
 import { Button } from "~/components/ui/button";
-import { Input } from "~/components/ui/input";
 import {
   Dialog,
   DialogContent,
@@ -10,6 +12,7 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "~/components/ui/dialog";
+import { Input } from "~/components/ui/input";
 import {
   Select,
   SelectContent,
@@ -17,27 +20,14 @@ import {
   SelectTrigger,
   SelectValue,
 } from "~/components/ui/select";
-import { Label } from "./ui/label";
-import { useSearchParams, useRouter } from "next/navigation";
-import { useState } from "react";
-import { useQuery } from "@tanstack/react-query";
 import { getAllTags } from "~/server/actions/tag_action";
-import { Badge } from "./ui/badge";
+import { Label } from "./ui/label";
+import { MultiSelect } from "./ui/multi-select";
+import { type Category } from "@prisma/client";
 
 const SearchInput = () => {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const query = searchParams.get("query") || "";
-  const type = searchParams.get("type") || "";
-  const tag = searchParams.get("tag") || "";
-  const name = searchParams.get("name") || "";
-
-  const [open, setOpen] = useState(false);
-  const [advancedSearch, setAdvancedSearch] = useState({
-    type: type || "any",
-    name: name,
-    tags: tag ? new Set([tag]) : new Set<string>(),
-  });
 
   // Fetch all tags for the dropdown
   const { data: tags } = useQuery({
@@ -45,57 +35,63 @@ const SearchInput = () => {
     queryFn: async () => await getAllTags(),
   });
 
-  const handleBasicSearch = (e: React.FormEvent<HTMLFormElement>) => {
-    e.preventDefault();
-    const formData = new FormData(e.currentTarget);
-    const query = formData.get("query") as string;
-    router.push(`/search?query=${encodeURIComponent(query)}`);
-  };
+  // Get default values from the params
+  const defaultQuery = searchParams.get("query") || "";
+  const defaultCategory = (searchParams.get("category") as Category) || "ANY";
+  const defaultTags = searchParams.get("tags")?.split(",") || [];
+
+  // States to manage the search
+  const [query, setQuery] = useState<string>(defaultQuery);
+  const [selectedTags, setSelectedTags] = useState<string[]>(defaultTags);
+  const [category, setCategory] = useState<Category | "ANY">(defaultCategory);
+
+  const [open, setOpen] = useState(false);
+
+  // const handleBasicSearch = (e: React.FormEvent<HTMLFormElement>) => {
+  //   e.preventDefault();
+  //   const formData = new FormData(e.currentTarget);
+  //   const query = formData.get("query") as string;
+  //   router.push(`/search?query=${encodeURIComponent(query)}`);
+  // };
 
   const handleAdvancedSearch = () => {
     const params = new URLSearchParams();
+
+    if (category !== "ANY") params.append("category", category);
     if (query) params.append("query", query);
-    if (advancedSearch.type !== "any") params.append("type", advancedSearch.type);
-    if (advancedSearch.name) params.append("name", advancedSearch.name);
-    if (advancedSearch.tags.size > 0) {
-      Array.from(advancedSearch.tags).forEach(tag => {
-        params.append("tag", tag);
-      });
-    }
+    if (selectedTags.length > 0) params.append("tags", selectedTags.join(","));
+
     router.push(`/search?${params.toString()}`);
+
     setOpen(false);
   };
 
   const handleReset = () => {
-    setAdvancedSearch({
-      type: "any",
-      name: "",
-      tags: new Set<string>(),
-    });
-    router.push(`/search?query=${encodeURIComponent(query)}`);
-    setOpen(false);
+    setCategory("ANY");
+    setSelectedTags([]);
+    setQuery("");
   };
 
-  const handleTagSelect = (tagName: string) => {
-    setAdvancedSearch(prev => ({
-      ...prev,
-      tags: new Set(prev.tags).add(tagName)
-    }));
-  };
+  // const handleTagSelect = (tagName: string) => {
+  //   setAdvancedSearch((prev) => ({
+  //     ...prev,
+  //     tags: new Set(prev.tags).add(tagName),
+  //   }));
+  // };
 
-  const handleTagRemove = (tagName: string) => {
-    setAdvancedSearch(prev => {
-      const newTags = new Set(prev.tags);
-      newTags.delete(tagName);
-      return {
-        ...prev,
-        tags: newTags
-      };
-    });
-  };
+  // const handleTagRemove = (tagName: string) => {
+  //   setAdvancedSearch((prev) => {
+  //     const newTags = new Set(prev.tags);
+  //     newTags.delete(tagName);
+  //     return {
+  //       ...prev,
+  //       tags: newTags,
+  //     };
+  //   });
+  // };
 
   return (
-    <form onSubmit={handleBasicSearch} className="relative">
+    <form action={"/search"} className="relative">
       <Button
         type="submit"
         size={"icon"}
@@ -130,67 +126,75 @@ const SearchInput = () => {
 
           <div className="flex flex-col gap-4">
             <div className="flex flex-col gap-2">
+              <Label>Query</Label>
+              <Input
+                placeholder="Enter a term that matches part of the file name"
+                onChange={(e) => setQuery(e.target.value)}
+                value={query}
+              />
+            </div>
+
+            <div className="flex flex-col gap-2">
               <Label>File type</Label>
               <Select
-                value={advancedSearch.type}
-                onValueChange={(value) =>
-                  setAdvancedSearch({ ...advancedSearch, type: value })
-                }
+                onValueChange={(value: Category | "ANY") => setCategory(value)}
+                value={category}
               >
                 <SelectTrigger>
                   <SelectValue placeholder="Select the type of the file" />
                 </SelectTrigger>
+
                 <SelectContent>
-                  <SelectItem value="any">Any</SelectItem>
-                  <SelectItem value="documents">Documents</SelectItem>
-                  <SelectItem value="spreadsheets">Spreadsheets</SelectItem>
-                  <SelectItem value="presentations">Presentations</SelectItem>
-                  <SelectItem value="images">Photos & Images</SelectItem>
-                  <SelectItem value="pdfs">PDFs</SelectItem>
-                  <SelectItem value="videos">Videos</SelectItem>
-                  <SelectItem value="audio">Audio</SelectItem>
+                  <SelectItem value="ANY">Any</SelectItem>
+                  <SelectItem value="IMAGE">Image</SelectItem>
+                  <SelectItem value="VIDEO">Video</SelectItem>
+                  <SelectItem value="DOCUMENT">Document</SelectItem>
                 </SelectContent>
               </Select>
             </div>
 
             <div className="flex flex-col gap-2">
-              <Label>Item name</Label>
-              <Input
-                placeholder="Enter a term that matches part of the file name"
-                value={advancedSearch.name}
-                onChange={(e) =>
-                  setAdvancedSearch({ ...advancedSearch, name: e.target.value })
-                }
-              />
-            </div>
-
-            <div className="flex flex-col gap-2">
               <Label>File tag</Label>
-              <div className="flex flex-col gap-2">
-                <Select
-                  onValueChange={handleTagSelect}
-                >
+
+              <MultiSelect
+                value={selectedTags}
+                defaultValue={selectedTags}
+                options={
+                  tags?.map((item) => ({
+                    label: item.name,
+                    value: item.name,
+                  })) || []
+                }
+                onValueChange={setSelectedTags}
+                placeholder="Select Tags"
+                variant="inverted"
+                animation={2}
+                maxCount={3}
+              />
+              {/* <div className="flex flex-col gap-2">
+                <Select>
                   <SelectTrigger>
                     <SelectValue placeholder="Select tags to filter by" />
                   </SelectTrigger>
                   <SelectContent>
                     {tags?.map((tag) => (
-                      <SelectItem 
-                        key={tag.id} 
+                      <SelectItem
+                        key={tag.id}
                         value={tag.name}
                         disabled={advancedSearch.tags.has(tag.name)}
                       >
-                        {tag.name} {advancedSearch.tags.has(tag.name) && '(selected)'}
+                        {tag.name}{" "}
+                        {advancedSearch.tags.has(tag.name) && "(selected)"}
                       </SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
-                
+
                 {advancedSearch.tags.size > 0 && (
                   <div className="flex flex-wrap gap-2">
                     {Array.from(advancedSearch.tags).map((tagName) => (
-                      <Badge 
-                        key={tagName} 
+                      <Badge
+                        key={tagName}
                         variant="secondary"
                         className="flex items-center gap-1"
                       >
@@ -207,7 +211,7 @@ const SearchInput = () => {
                     ))}
                   </div>
                 )}
-              </div>
+              </div> */}
             </div>
           </div>
 
@@ -219,7 +223,11 @@ const SearchInput = () => {
             >
               Reset
             </Button>
-            <Button className="rounded-full" onClick={handleAdvancedSearch}>
+            <Button
+              type="button"
+              className="rounded-full"
+              onClick={handleAdvancedSearch}
+            >
               Search
             </Button>
           </DialogFooter>
