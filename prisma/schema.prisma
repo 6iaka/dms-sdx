@@ -60,3 +60,12 @@ enum Category {
   VIDEO
   DOCUMENT
 }
+
+model User {
+  id        Int      @id @default(autoincrement())
+  email     String   @unique
+  name      String?
+  role      String   @default("PENDING")
+  createdAt DateTime @default(now())
+  lastActive DateTime?
+}
