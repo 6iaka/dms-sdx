@@ -27,24 +27,21 @@ import {
 } from "~/components/ui/select";
 import { useToast } from "~/hooks/use-toast";
 import { deleteFile, assignTagToFiles, moveFiles } from "~/server/actions/file_action";
-import { deleteFolder, moveFolder, createRootFolder } from "~/server/actions/folder_action";
+import { deleteFolder, moveFolder, createRootFolder, findFolderById } from "~/server/actions/folder_action";
 import { getAllTags } from "~/server/actions/tag_action";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Badge } from "~/components/ui/badge";
 
 type FolderWithChildren = Folder & {
   children: Folder[];
-  files: (File & {
-    tags: Tag[];
-  })[];
+  files: (File & { tags: Tag[] })[];
 };
 
 const FolderPageClient = ({ data }: { data: FolderWithChildren }) => {
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const [isSelecting, setIsSelecting] = useState(false);
-  const [selectedFiles, setSelectedFiles] = useState<Set<number>>(new Set());
-  const [selectedFolders, setSelectedFolders] = useState<Set<number>>(new Set());
+  const [selectedItems, setSelectedItems] = useState<number[]>([]);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [showTagDialog, setShowTagDialog] = useState(false);
   const [selectedTags, setSelectedTags] = useState<string[]>([]);
@@ -53,6 +50,8 @@ const FolderPageClient = ({ data }: { data: FolderWithChildren }) => {
   const [targetFolderId, setTargetFolderId] = useState<number | null>(null);
   const [rootFolder, setRootFolder] = useState<Folder | null>(null);
   const [loading, setLoading] = useState(true);
+  const [folder, setFolder] = useState<FolderWithChildren>(data);
+  const [files, setFiles] = useState<(File & { tags: Tag[] })[]>(data.files || []);
 
   const { data: tags } = useQuery({
     queryKey: ["tags"],
@@ -94,45 +93,33 @@ const FolderPageClient = ({ data }: { data: FolderWithChildren }) => {
     }
   }
 
-  const handleSelect = (id: number, selected: boolean, isFolder: boolean) => {
-    if (isFolder) {
-      setSelectedFolders(prev => {
-        const next = new Set(prev);
-        if (selected) {
-          next.add(id);
-        } else {
-          next.delete(id);
-        }
-        return next;
-      });
+  const handleSelectAll = () => {
+    const hasSelectedItems = selectedItems.length > 0;
+    if (!hasSelectedItems) {
+      const allFileIds = files.map(file => file.id);
+      const allFolderIds = folder.children.map(child => child.id);
+      setSelectedItems([...allFileIds, ...allFolderIds]);
     } else {
-      setSelectedFiles(prev => {
-        const next = new Set(prev);
-        if (selected) {
-          next.add(id);
-        } else {
-          next.delete(id);
-        }
-        return next;
-      });
+      setSelectedItems([]);
     }
   };
 
-  const handleSelectAll = () => {
-    const allFileIds = new Set(data.files.map(file => file.id));
-    const allFolderIds = new Set(data.children.map(folder => folder.id));
-    setSelectedFiles(allFileIds);
-    setSelectedFolders(allFolderIds);
+  const handleFolderSelect = (folderId: number, selected: boolean): void => {
+    if (selected) {
+      setSelectedItems(prev => [...prev, folderId]);
+    } else {
+      setSelectedItems(prev => prev.filter(id => id !== folderId));
+    }
   };
 
   const handleDelete = async () => {
     try {
       // Delete selected files
-      for (const fileId of selectedFiles) {
+      for (const fileId of selectedItems) {
         await deleteFile(fileId);
       }
       // Delete selected folders
-      for (const folderId of selectedFolders) {
+      for (const folderId of selectedItems.filter(id => typeof id === 'number')) {
         await deleteFolder(folderId);
       }
       toast({
@@ -140,8 +127,7 @@ const FolderPageClient = ({ data }: { data: FolderWithChildren }) => {
         description: "Items deleted successfully",
       });
       setShowDeleteDialog(false);
-      setSelectedFiles(new Set());
-      setSelectedFolders(new Set());
+      setSelectedItems([]);
       setIsSelecting(false);
       // Invalidate queries to refresh the data
       await queryClient.invalidateQueries({ queryKey: ["files"] });
@@ -162,7 +148,7 @@ const FolderPageClient = ({ data }: { data: FolderWithChildren }) => {
     
     try {
       await assignTagToFiles({
-        fileIds: Array.from(selectedFiles),
+        fileIds: selectedItems,
         tagNames: selectedTags,
       });
       toast({
@@ -171,7 +157,7 @@ const FolderPageClient = ({ data }: { data: FolderWithChildren }) => {
       });
       setShowTagDialog(false);
       setSelectedTags([]);
-      setSelectedFiles(new Set());
+      setSelectedItems([]);
       setIsSelecting(false);
       await queryClient.invalidateQueries({ queryKey: ["files"] });
       await queryClient.invalidateQueries({ queryKey: ["tags"] });
@@ -189,15 +175,15 @@ const FolderPageClient = ({ data }: { data: FolderWithChildren }) => {
     
     try {
       // Move selected files
-      if (selectedFiles.size > 0) {
+      if (selectedItems.length > 0) {
         await moveFiles({
-          fileIds: Array.from(selectedFiles),
+          fileIds: selectedItems,
           targetFolderId,
         });
       }
       // Move selected folders
-      if (selectedFolders.size > 0) {
-        for (const folderId of selectedFolders) {
+      if (selectedItems.length > 0 && selectedItems.every(id => typeof id === 'number')) {
+        for (const folderId of selectedItems.filter(id => typeof id === 'number')) {
           await moveFolder(folderId, targetFolderId);
         }
       }
@@ -207,8 +193,7 @@ const FolderPageClient = ({ data }: { data: FolderWithChildren }) => {
       });
       setShowMoveDialog(false);
       setTargetFolderId(null);
-      setSelectedFiles(new Set());
-      setSelectedFolders(new Set());
+      setSelectedItems([]);
       setIsSelecting(false);
       await queryClient.invalidateQueries({ queryKey: ["files"] });
       await queryClient.invalidateQueries({ queryKey: ["folders"] });
@@ -223,10 +208,10 @@ const FolderPageClient = ({ data }: { data: FolderWithChildren }) => {
 
   // Update existing tags when files are selected
   useEffect(() => {
-    if (selectedFiles.size > 0) {
+    if (selectedItems.length > 0) {
       const tags = new Set<string>();
-      data.files
-        .filter(file => selectedFiles.has(file.id))
+      files
+        .filter(file => selectedItems.includes(file.id))
         .forEach(file => {
           if (file.tags) {
             file.tags.forEach(tag => tags.add(tag.name));
@@ -236,7 +221,7 @@ const FolderPageClient = ({ data }: { data: FolderWithChildren }) => {
     } else {
       setSelectedTags([]);
     }
-  }, [selectedFiles, data.files]);
+  }, [selectedItems, files]);
 
   return (
     <>
@@ -285,8 +270,8 @@ const FolderPageClient = ({ data }: { data: FolderWithChildren }) => {
                 </Button>
               </>
             )}
-            <SelectionMode 
-              onSelect={setIsSelecting} 
+            <SelectionMode
+              onSelect={setIsSelecting}
               onSelectAll={handleSelectAll}
             />
             {!isSelecting && (
@@ -310,11 +295,11 @@ const FolderPageClient = ({ data }: { data: FolderWithChildren }) => {
             {data.children.length > 0 ? (
               data.children.map((item) => (
                 <FolderCard 
-                  data={item} 
                   key={item.id}
+                  data={{ ...item, files: [] }}
                   isSelecting={isSelecting}
-                  isSelected={selectedFolders.has(item.id)}
-                  onSelect={(selected) => handleSelect(item.id, selected, true)}
+                  isSelected={selectedItems.includes(item.id)}
+                  onSelect={(id, selected) => handleFolderSelect(id, selected)}
                 />
               ))
             ) : (
@@ -329,11 +314,11 @@ const FolderPageClient = ({ data }: { data: FolderWithChildren }) => {
             {data.files.length > 0 ? (
               data.files.map((item) => (
                 <FileCard 
-                  data={item} 
                   key={item.id}
+                  data={item}
                   isSelecting={isSelecting}
-                  isSelected={selectedFiles.has(item.id)}
-                  onSelect={(selected) => handleSelect(item.id, selected, false)}
+                  isSelected={selectedItems.includes(item.id)}
+                  onSelect={(selected: boolean) => handleFolderSelect(item.id, selected)}
                 />
               ))
             ) : (
@@ -348,7 +333,7 @@ const FolderPageClient = ({ data }: { data: FolderWithChildren }) => {
           <DialogHeader>
             <DialogTitle>Delete Items</DialogTitle>
             <DialogDescription>
-              Are you sure you want to delete {selectedFiles.size} file{selectedFiles.size !== 1 ? "s" : ""} and {selectedFolders.size} folder{selectedFolders.size !== 1 ? "s" : ""}? This action cannot be undone.
+              Are you sure you want to delete {selectedItems.length} item{selectedItems.length !== 1 ? "s" : ""}? This action cannot be undone.
             </DialogDescription>
           </DialogHeader>
           <DialogFooter>
@@ -367,7 +352,7 @@ const FolderPageClient = ({ data }: { data: FolderWithChildren }) => {
           <DialogHeader>
             <DialogTitle>Assign Tags</DialogTitle>
             <DialogDescription>
-              Select tags to assign to {selectedFiles.size} file{selectedFiles.size !== 1 ? "s" : ""}.
+              Select tags to assign to {selectedItems.length} item{selectedItems.length !== 1 ? "s" : ""}.
             </DialogDescription>
           </DialogHeader>
           <div className="flex flex-col gap-4">
@@ -432,7 +417,7 @@ const FolderPageClient = ({ data }: { data: FolderWithChildren }) => {
           <DialogHeader>
             <DialogTitle>Move Items</DialogTitle>
             <DialogDescription>
-              Select a folder to move {selectedFiles.size} file{selectedFiles.size !== 1 ? "s" : ""} and {selectedFolders.size} folder{selectedFolders.size !== 1 ? "s" : ""} to.
+              Select a folder to move {selectedItems.length} item{selectedItems.length !== 1 ? "s" : ""} to.
             </DialogDescription>
           </DialogHeader>
           <div className="flex flex-col gap-4">

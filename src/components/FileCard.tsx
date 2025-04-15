@@ -175,4 +175,4 @@ const FileCard = ({ data, isSelecting, isSelected, onSelect }: Props) => {
   );
 };
 
-export { FileCard };
+export default FileCard;
