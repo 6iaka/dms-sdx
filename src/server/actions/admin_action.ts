@@ -142,6 +142,24 @@ export const syncDrive = async () => {
                   categeory: category,
                   title: item.name!,
                 });
+              } else {
+                // Create new file if it doesn't exist
+                return await fileService.upsert({
+                  folder: { connect: { googleId: parentFolder } },
+                  iconLink: item.iconLink?.replace("16", "64") || "",
+                  originalFilename: item.originalFilename!,
+                  webContentLink: item.webContentLink!,
+                  fileExtension: item.fileExtension!,
+                  thumbnailLink: item.thumbnailLink,
+                  webViewLink: item.webViewLink!,
+                  description: item.description,
+                  fileSize: Number(item.size),
+                  mimeType: item.mimeType!,
+                  userClerkId: user.id,
+                  categeory: category,
+                  title: item.name!,
+                  googleId: item.id!,
+                });
               }
             } catch (error) {
               console.error("Error syncing file:", error);
