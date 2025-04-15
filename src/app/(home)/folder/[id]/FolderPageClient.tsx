@@ -45,11 +45,9 @@ const FolderPageClient = ({ data }: { data: FolderWithChildren }) => {
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [showTagDialog, setShowTagDialog] = useState(false);
   const [selectedTags, setSelectedTags] = useState<string[]>([]);
-  const [existingTags, setExistingTags] = useState<Tag[]>([]);
   const [showMoveDialog, setShowMoveDialog] = useState(false);
   const [targetFolderId, setTargetFolderId] = useState<number | null>(null);
   const [rootFolder, setRootFolder] = useState<Folder | null>(null);
-  const [loading, setLoading] = useState(true);
   const [folder, setFolder] = useState<FolderWithChildren>(data);
   const [files, setFiles] = useState<(File & { tags: Tag[] })[]>(data.files || []);
 
@@ -68,7 +66,7 @@ const FolderPageClient = ({ data }: { data: FolderWithChildren }) => {
         console.error("Failed to fetch root folder:", error);
       }
     };
-    fetchRootFolder();
+    void fetchRootFolder();
   }, []);
 
   useEffect(() => {
@@ -85,11 +83,8 @@ const FolderPageClient = ({ data }: { data: FolderWithChildren }) => {
         setFolder(folderData);
         setFiles(folderData.files);
       }
-      setExistingTags(tagsData);
     } catch (error) {
       console.error("Error loading data:", error);
-    } finally {
-      setLoading(false);
     }
   }
 
