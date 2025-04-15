@@ -70,23 +70,22 @@ const FolderPageClient = ({ data }: { data: FolderWithChildren }) => {
   }, []);
 
   useEffect(() => {
-    void loadData();
-  }, [data.id]);
-
-  async function loadData() {
-    try {
-      const [folderData, tagsData] = await Promise.all([
-        findFolderById(data.id),
-        getAllTags(),
-      ]);
-      if (folderData) {
-        setFolder(folderData);
-        setFiles(folderData.files);
+    const loadDataAsync = async () => {
+      try {
+        const [folderData, tagsData] = await Promise.all([
+          findFolderById(data.id),
+          getAllTags(),
+        ]);
+        if (folderData) {
+          setFolder(folderData);
+          setFiles(folderData.files);
+        }
+      } catch (error) {
+        console.error("Error loading data:", error);
       }
-    } catch (error) {
-      console.error("Error loading data:", error);
-    }
-  }
+    };
+    void loadDataAsync();
+  }, [data.id]);
 
   const handleSelectAll = () => {
     const hasSelectedItems = selectedItems.length > 0;
