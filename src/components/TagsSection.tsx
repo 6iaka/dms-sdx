@@ -173,6 +173,35 @@ const TagsSection = () => {
     }
   };
 
+  const handleCreateTag = async () => {
+    if (!newTagName.trim()) {
+      toast({
+        title: "Error",
+        description: "Tag name cannot be empty",
+        variant: "destructive",
+      });
+      return;
+    }
+    try {
+      const response = await upsertTag(newTagName);
+      if (response) {
+        toast({ title: "Tag created successfully" });
+        setNewTagName("");
+        await queryClient.invalidateQueries({ queryKey: ["tags"] });
+      } else {
+        toast({
+          title: "Error creating tag",
+          variant: "destructive",
+        });
+      }
+    } catch {
+      toast({
+        title: "Error creating tag",
+        variant: "destructive",
+      });
+    }
+  };
+
   return (
     <Dialog>
       <DialogTrigger asChild>
@@ -198,6 +227,7 @@ const TagsSection = () => {
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               className="max-w-sm"
+              autoFocus
             />
           </div>
 
