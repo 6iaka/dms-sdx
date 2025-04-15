@@ -42,7 +42,7 @@ export default function UsersPage() {
       }
       await updateUserRole(userId, role);
       toast.success("User role updated successfully");
-      void loadUsers();
+      await loadUsers();
     } catch (error) {
       console.error("Failed to update user role:", error);
       toast.error("Failed to update user role");
