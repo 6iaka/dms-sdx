@@ -1,7 +1,7 @@
 "use client";
 
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { MoreVertical, Tag, Trash2, Pencil, Loader2 } from "lucide-react";
+import { MoreVertical, Tag as TagIcon, Trash2, Pencil, Loader2 } from "lucide-react";
 import { useState } from "react";
 import { Button } from "~/components/ui/button";
 import {
@@ -177,7 +177,7 @@ const TagsSection = () => {
     <Dialog>
       <DialogTrigger asChild>
         <Button variant="ghost" size="icon" className="rounded-full">
-          <Tag className="h-5 w-5" />
+          <TagIcon className="h-5 w-5" />
         </Button>
       </DialogTrigger>
       <DialogContent className="sm:max-w-[800px]">
