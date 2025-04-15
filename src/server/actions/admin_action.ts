@@ -206,7 +206,7 @@ export const syncDrive = async () => {
             } catch (error) {
               console.error(`Error syncing file ${item.name}:`, error);
               errorCount++;
-              throw error;
+              return null; // Return null to indicate failure but continue processing
             }
           })
         )
