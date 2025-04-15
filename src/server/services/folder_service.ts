@@ -7,9 +7,10 @@ export class FolderService {
    * Get all folders from the database
    * @returns Array of folders
    */
-  findMany = async () => {
+  findMany = async (filter?: Prisma.FolderWhereInput) => {
     try {
       const folders = await prisma.folder.findMany({
+        where: filter,
         orderBy: { createdAt: "desc" },
         include: {
           files: true,
