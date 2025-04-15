@@ -30,7 +30,7 @@ type Props = {
   isSelecting?: boolean;
 };
 
-const FolderCard = ({ data, onSelect, isSelected, isSelecting }: Props) => {
+export default function FolderCard({ data, onSelect, isSelected, isSelecting }: Props) {
   const [isHovered, setIsHovered] = useState(false);
   const { toast } = useToast();
   const [isPending, startTransition] = useTransition();
@@ -112,7 +112,7 @@ const FolderCard = ({ data, onSelect, isSelected, isSelecting }: Props) => {
   return (
     <div
       className={cn(
-        "group relative flex flex-col gap-2 rounded-lg bg-card p-2 transition-all hover:bg-secondary/25",
+        "group relative flex items-center gap-2 rounded-lg bg-card p-2 transition-all hover:bg-secondary/25",
         isSelecting && "cursor-pointer",
         isSelected && "bg-primary/10 hover:bg-primary/20"
       )}
@@ -141,7 +141,7 @@ const FolderCard = ({ data, onSelect, isSelected, isSelecting }: Props) => {
         width="100"
         height="100"
         viewBox="0 0 48 48"
-        className="size-12 flex-shrink-0 transition-all group-hover:-translate-y-1"
+        className="size-10 flex-shrink-0 transition-all group-hover:-translate-y-1"
       >
         <path
           fill="#FFA000"
@@ -153,59 +153,55 @@ const FolderCard = ({ data, onSelect, isSelected, isSelecting }: Props) => {
         ></path>
       </svg>
 
-      <div className="pointer-events-none flex flex-1 select-none flex-col">
-        <div className="flex items-center gap-2">
+      <div className="flex flex-1 items-center gap-2">
+        <div className="flex flex-1 items-center gap-2">
           <h3 className="line-clamp-1 text-sm font-semibold capitalize">
             {data.title}
           </h3>
           {data.isFavorite && (
-            <Star className="h-4 w-4 fill-yellow-400 text-yellow-400" />
+            <Star className="h-3 w-3 fill-yellow-400 text-yellow-400" />
           )}
         </div>
-        <p className="line-clamp-1 text-xs font-light">{data.description}</p>
+        {!data.isRoot && !isSelecting && (
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button
+                size={"icon"}
+                variant={"ghost"}
+                disabled={isPending}
+                className="size-5 shrink-0 rounded-full"
+              >
+                {isPending ? (
+                  <Loader2 className="h-3 w-3 animate-spin" />
+                ) : (
+                  <EllipsisVertical className="h-3 w-3" />
+                )}
+              </Button>
+            </DropdownMenuTrigger>
+
+            <DropdownMenuContent
+              align="start"
+              className="w-44"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <EditFolderForm id={data.id} />
+
+              <DropdownMenuItem onSelect={handleToggleFavorite} className="flex items-center gap-2">
+                <Star className="h-4 w-4" />
+                <span className="flex-1">{data.isFavorite ? "Remove from Favorites" : "Add to Favorites"}</span>
+              </DropdownMenuItem>
+
+              <DropdownMenuItem
+                onSelect={() => startTransition(handleDelete)}
+                className="flex items-center gap-2"
+              >
+                <Trash className="h-4 w-4" />
+                <span className="flex-1">Delete</span>
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        )}
       </div>
-
-      {!data.isRoot && !isSelecting && (
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <Button
-              size={"icon"}
-              variant={"ghost"}
-              disabled={isPending}
-              className="size-6 shrink-0 rounded-full"
-            >
-              {isPending ? (
-                <Loader2 className="animate-spin" />
-              ) : (
-                <EllipsisVertical />
-              )}
-            </Button>
-          </DropdownMenuTrigger>
-
-          <DropdownMenuContent
-            align="start"
-            className="w-44"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <EditFolderForm id={data.id} />
-
-            <DropdownMenuItem onSelect={handleToggleFavorite} className="flex items-center gap-2">
-              <Star className="h-4 w-4" />
-              <span className="flex-1">{data.isFavorite ? "Remove from Favorites" : "Add to Favorites"}</span>
-            </DropdownMenuItem>
-
-            <DropdownMenuItem
-              onSelect={() => startTransition(handleDelete)}
-              className="flex items-center gap-2"
-            >
-              <Trash className="h-4 w-4" />
-              <span className="flex-1">Delete</span>
-            </DropdownMenuItem>
-          </DropdownMenuContent>
-        </DropdownMenu>
-      )}
     </div>
   );
-};
-
-export default FolderCard;
+}
