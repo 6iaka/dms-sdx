@@ -9,6 +9,8 @@ import { Button } from "./ui/button";
 import { useToast } from "~/hooks/use-toast";
 import { useQueryClient } from "@tanstack/react-query";
 import { useTransition } from "react";
+import { useState } from "react";
+import { useRouter } from "next/navigation";
 
 import {
   DropdownMenu,
@@ -17,12 +19,19 @@ import {
   DropdownMenuTrigger,
 } from "./ui/dropdown-menu";
 
-type Props = { data: Folder };
+type Props = {
+  data: Folder;
+  isSelecting?: boolean;
+  isSelected?: boolean;
+  onSelect?: (selected: boolean) => void;
+};
 
-const FolderCard = ({ data }: Props) => {
+const FolderCard = ({ data, isSelecting = false, isSelected = false, onSelect }: Props) => {
+  const [isHovered, setIsHovered] = useState(false);
   const { toast } = useToast();
   const [isPending, startTransition] = useTransition();
   const queryClient = useQueryClient();
+  const router = useRouter();
 
   const handleDelete = async () => {
     try {
@@ -33,7 +42,8 @@ const FolderCard = ({ data }: Props) => {
       });
       await queryClient.invalidateQueries({ queryKey: ["folders"] });
       await queryClient.invalidateQueries({ queryKey: ["files"] });
-    } catch {
+    } catch (error) {
+      console.error("Failed to delete folder:", error);
       toast({
         title: "Error",
         description: "Failed to delete folder",
@@ -83,14 +93,39 @@ const FolderCard = ({ data }: Props) => {
     }
   };
 
+  const handleClick = (e: React.MouseEvent) => {
+    if (isSelecting) {
+      e.preventDefault();
+      onSelect?.(!isSelected);
+    } else {
+      router.push(`/folder/${data.id}`);
+    }
+  };
+
   return (
-    <Link
-      href={`/folder/${data.id}`}
+    <div
+      onClick={handleClick}
       className={cn(
-        "group relative flex items-center gap-2.5 rounded-lg bg-card p-2 transition-all hover:bg-secondary/25",
+        "group relative flex cursor-pointer items-center gap-2.5 rounded-lg bg-card p-2 transition-all hover:bg-secondary/25",
         isPending && "pointer-events-none opacity-20",
       )}
     >
+      {isSelecting && (
+        <div 
+          className="absolute left-2 top-2 z-10"
+          onClick={(e) => e.stopPropagation()}
+        >
+          <input
+            type="checkbox"
+            checked={isSelected}
+            onChange={(e) => {
+              e.stopPropagation();
+              onSelect?.(e.target.checked);
+            }}
+            className="h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary"
+          />
+        </div>
+      )}
       <svg
         xmlns="http://www.w3.org/2000/svg"
         x="0px"
@@ -122,7 +157,7 @@ const FolderCard = ({ data }: Props) => {
         <p className="line-clamp-1 text-xs font-light">{data.description}</p>
       </div>
 
-      {!data.isRoot && (
+      {!data.isRoot && !isSelecting && (
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
             <Button
@@ -161,7 +196,7 @@ const FolderCard = ({ data }: Props) => {
           </DropdownMenuContent>
         </DropdownMenu>
       )}
-    </Link>
+    </div>
   );
 };
 

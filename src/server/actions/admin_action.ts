@@ -7,13 +7,17 @@ import driveService from "../services/drive_service";
 import fileService from "../services/file_service";
 import folderService from "../services/folder_service";
 import { revalidatePath } from "next/cache";
-const limit = Limit(10);
+
+// Limit concurrent operations to prevent overload
+const limit = Limit(5);
 
 export const syncDrive = async () => {
   const user = await currentUser();
 
   try {
     if (!user) throw new Error("Not authorized");
+    
+    // Get all items from Google Drive
     const items = await driveService.getAllItems();
     if (!items) throw new Error("Failed to retrieve google drive files");
 
@@ -30,6 +34,10 @@ export const syncDrive = async () => {
       }
     });
 
+    // Get all existing folders to avoid unnecessary updates
+    const existingFolders = await folderService.findMany();
+    const existingFolderMap = new Map(existingFolders.map(f => [f.googleId, f]));
+
     // Sync folders in order of hierarchy (root first, then children)
     const syncedFolders = new Set<string>();
     const syncFolder = async (folderId: string) => {
@@ -41,6 +49,16 @@ export const syncDrive = async () => {
       const parentId = folderMap.get(folderId);
       if (parentId && !syncedFolders.has(parentId)) {
         await syncFolder(parentId);
+      }
+
+      // Skip if folder exists and hasn't changed
+      const existingFolder = existingFolderMap.get(folderId);
+      if (existingFolder && 
+          existingFolder.title === folder.name &&
+          existingFolder.description === folder.description &&
+          existingFolder.parentId === (parentId ? existingFolderMap.get(parentId)?.id : null)) {
+        syncedFolders.add(folderId);
+        return;
       }
 
       try {
@@ -60,9 +78,11 @@ export const syncDrive = async () => {
       }
     };
 
-    // Sync all folders
+    // Sync all folders with proper error handling
     await Promise.allSettled(
-      folderItems.map(item => syncFolder(item.id!))
+      folderItems.map(item => 
+        limit(() => syncFolder(item.id!))
+      )
     );
 
     // Then sync all files
@@ -70,49 +90,71 @@ export const syncDrive = async () => {
       (item) => item.mimeType !== "application/vnd.google-apps.folder"
     );
 
-    await Promise.allSettled(
-      fileItems.map((item) =>
-        limit(async () => {
-          try {
-            const mimeType = item.mimeType!;
-            const category = getCategoryFromMimeType(mimeType);
-            if (!category) {
-              console.warn(`Unrecognized file type for ${item.name}: ${mimeType}`);
-              return;
-            }
+    // Get all existing files to avoid unnecessary updates
+    const existingFiles = await fileService.findMany();
+    const existingFileMap = new Map(existingFiles.map(f => [f.googleId, f]));
 
-            const parentFolder = item.parents?.[0];
-            if (!parentFolder) {
-              console.warn(`File ${item.name} has no parent folder`);
-              return;
-            }
+    // Process files in larger batches
+    const batchSize = 50;
+    for (let i = 0; i < fileItems.length; i += batchSize) {
+      const batch = fileItems.slice(i, i + batchSize);
+      await Promise.allSettled(
+        batch.map((item) =>
+          limit(async () => {
+            try {
+              const mimeType = item.mimeType!;
+              const category = getCategoryFromMimeType(mimeType);
+              if (!category) {
+                console.warn(`Unrecognized file type for ${item.name}: ${mimeType}`);
+                return;
+              }
 
-            return await fileService.upsert({
-              folder: { connect: { googleId: parentFolder } },
-              iconLink: item.iconLink?.replace("16", "64") || "",
-              originalFilename: item.originalFilename!,
-              webContentLink: item.webContentLink!,
-              fileExtension: item.fileExtension!,
-              thumbnailLink: item.thumbnailLink,
-              webViewLink: item.webViewLink!,
-              description: item.description,
-              fileSize: Number(item.size),
-              mimeType: item.mimeType!,
-              userClerkId: user.id,
-              categeory: category,
-              googleId: item.id!,
-              title: item.name!,
-            });
-          } catch (error) {
-            console.error("Error syncing file:", error);
-          }
-        }),
-      ),
-    );
+              const parentFolder = item.parents?.[0];
+              if (!parentFolder) {
+                console.warn(`File ${item.name} has no parent folder`);
+                return;
+              }
+
+              // Check if file exists and hasn't changed
+              const existingFile = existingFileMap.get(item.id!);
+              if (existingFile && 
+                  existingFile.title === item.name &&
+                  existingFile.description === item.description &&
+                  existingFile.folder?.googleId === parentFolder &&
+                  existingFile.fileSize === Number(item.size)) {
+                return;
+              }
+
+              // Only update if the file exists, don't create new ones
+              if (existingFile) {
+                return await fileService.update(existingFile.id, {
+                  folder: { connect: { googleId: parentFolder } },
+                  iconLink: item.iconLink?.replace("16", "64") || "",
+                  originalFilename: item.originalFilename!,
+                  webContentLink: item.webContentLink!,
+                  fileExtension: item.fileExtension!,
+                  thumbnailLink: item.thumbnailLink,
+                  webViewLink: item.webViewLink!,
+                  description: item.description,
+                  fileSize: Number(item.size),
+                  mimeType: item.mimeType!,
+                  userClerkId: user.id,
+                  categeory: category,
+                  title: item.name!,
+                });
+              }
+            } catch (error) {
+              console.error("Error syncing file:", error);
+            }
+          })
+        )
+      );
+    }
 
     revalidatePath("/");
     revalidatePath("/folder/:id", "page");
   } catch (error) {
-    console.error((error as Error).message);
+    console.error("Error in syncDrive:", error);
+    throw error;
   }
 };

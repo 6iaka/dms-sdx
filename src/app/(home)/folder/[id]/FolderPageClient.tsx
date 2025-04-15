@@ -27,6 +27,7 @@ import {
 } from "~/components/ui/select";
 import { useToast } from "~/hooks/use-toast";
 import { deleteFile, assignTagToFiles, moveFiles } from "~/server/actions/file_action";
+import { deleteFolder, moveFolder, createRootFolder } from "~/server/actions/folder_action";
 import { getAllTags } from "~/server/actions/tag_action";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Badge } from "~/components/ui/badge";
@@ -43,50 +44,91 @@ const FolderPageClient = ({ data }: { data: FolderWithChildren }) => {
   const queryClient = useQueryClient();
   const [isSelecting, setIsSelecting] = useState(false);
   const [selectedFiles, setSelectedFiles] = useState<Set<number>>(new Set());
+  const [selectedFolders, setSelectedFolders] = useState<Set<number>>(new Set());
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [showTagDialog, setShowTagDialog] = useState(false);
   const [selectedTags, setSelectedTags] = useState<string[]>([]);
   const [existingTags, setExistingTags] = useState<string[]>([]);
   const [showMoveDialog, setShowMoveDialog] = useState(false);
   const [targetFolderId, setTargetFolderId] = useState<number | null>(null);
+  const [rootFolder, setRootFolder] = useState<Folder | null>(null);
 
   const { data: tags } = useQuery({
     queryKey: ["tags"],
     queryFn: async () => await getAllTags(),
   });
 
-  const handleSelect = (fileId: number, selected: boolean) => {
-    setSelectedFiles(prev => {
-      const next = new Set(prev);
-      if (selected) {
-        next.add(fileId);
-      } else {
-        next.delete(fileId);
+  // Fetch root folder
+  useEffect(() => {
+    const fetchRootFolder = async () => {
+      try {
+        const root = await createRootFolder();
+        if (root) setRootFolder(root);
+      } catch (error) {
+        console.error("Failed to fetch root folder:", error);
       }
-      return next;
-    });
+    };
+    fetchRootFolder();
+  }, []);
+
+  const handleSelect = (id: number, selected: boolean, isFolder: boolean) => {
+    if (isFolder) {
+      setSelectedFolders(prev => {
+        const next = new Set(prev);
+        if (selected) {
+          next.add(id);
+        } else {
+          next.delete(id);
+        }
+        return next;
+      });
+    } else {
+      setSelectedFiles(prev => {
+        const next = new Set(prev);
+        if (selected) {
+          next.add(id);
+        } else {
+          next.delete(id);
+        }
+        return next;
+      });
+    }
+  };
+
+  const handleSelectAll = () => {
+    const allFileIds = new Set(data.files.map(file => file.id));
+    const allFolderIds = new Set(data.children.map(folder => folder.id));
+    setSelectedFiles(allFileIds);
+    setSelectedFolders(allFolderIds);
   };
 
   const handleDelete = async () => {
     try {
+      // Delete selected files
       for (const fileId of selectedFiles) {
         await deleteFile(fileId);
       }
+      // Delete selected folders
+      for (const folderId of selectedFolders) {
+        await deleteFolder(folderId);
+      }
       toast({
         title: "Success",
-        description: "Files deleted successfully",
+        description: "Items deleted successfully",
       });
       setShowDeleteDialog(false);
       setSelectedFiles(new Set());
+      setSelectedFolders(new Set());
       setIsSelecting(false);
       // Invalidate queries to refresh the data
       await queryClient.invalidateQueries({ queryKey: ["files"] });
+      await queryClient.invalidateQueries({ queryKey: ["folders"] });
       await queryClient.invalidateQueries({ queryKey: ["tags"] });
     } catch (error) {
-      console.error("Failed to delete files:", error);
+      console.error("Failed to delete items:", error);
       toast({
         title: "Error",
-        description: "Failed to delete files",
+        description: "Failed to delete items",
         variant: "destructive",
       });
     }
@@ -124,23 +166,34 @@ const FolderPageClient = ({ data }: { data: FolderWithChildren }) => {
     if (!targetFolderId) return;
     
     try {
-      await moveFiles({
-        fileIds: Array.from(selectedFiles),
-        targetFolderId,
-      });
+      // Move selected files
+      if (selectedFiles.size > 0) {
+        await moveFiles({
+          fileIds: Array.from(selectedFiles),
+          targetFolderId,
+        });
+      }
+      // Move selected folders
+      if (selectedFolders.size > 0) {
+        for (const folderId of selectedFolders) {
+          await moveFolder(folderId, targetFolderId);
+        }
+      }
       toast({
         title: "Success",
-        description: "Files moved successfully",
+        description: "Items moved successfully",
       });
       setShowMoveDialog(false);
       setTargetFolderId(null);
       setSelectedFiles(new Set());
+      setSelectedFolders(new Set());
       setIsSelecting(false);
       await queryClient.invalidateQueries({ queryKey: ["files"] });
+      await queryClient.invalidateQueries({ queryKey: ["folders"] });
     } catch {
       toast({
         title: "Error",
-        description: "Failed to move files",
+        description: "Failed to move items",
         variant: "destructive",
       });
     }
@@ -210,7 +263,10 @@ const FolderPageClient = ({ data }: { data: FolderWithChildren }) => {
                 </Button>
               </>
             )}
-            <SelectionMode onSelect={setIsSelecting} />
+            <SelectionMode 
+              onSelect={setIsSelecting} 
+              onSelectAll={handleSelectAll}
+            />
             {!isSelecting && (
               <>
                 <FileUploadForm folderId={data.id} />
@@ -231,7 +287,13 @@ const FolderPageClient = ({ data }: { data: FolderWithChildren }) => {
           <div className="grid w-full grid-cols-[repeat(auto-fill,minmax(14rem,1fr))] gap-2">
             {data.children.length > 0 ? (
               data.children.map((item) => (
-                <FolderCard data={item} key={item.id} />
+                <FolderCard 
+                  data={item} 
+                  key={item.id}
+                  isSelecting={isSelecting}
+                  isSelected={selectedFolders.has(item.id)}
+                  onSelect={(selected) => handleSelect(item.id, selected, true)}
+                />
               ))
             ) : (
               <p className="text-sm text-muted-foreground">No Folders Here</p>
@@ -241,7 +303,6 @@ const FolderPageClient = ({ data }: { data: FolderWithChildren }) => {
 
         <section className="flex flex-col gap-2 rounded-lg">
           <h3 className="text-balance font-medium">Files</h3>
-
           <div className="grid w-full grid-cols-[repeat(auto-fill,minmax(9rem,1fr))] gap-2">
             {data.files.length > 0 ? (
               data.files.map((item) => (
@@ -250,7 +311,7 @@ const FolderPageClient = ({ data }: { data: FolderWithChildren }) => {
                   key={item.id}
                   isSelecting={isSelecting}
                   isSelected={selectedFiles.has(item.id)}
-                  onSelect={(selected) => handleSelect(item.id, selected)}
+                  onSelect={(selected) => handleSelect(item.id, selected, false)}
                 />
               ))
             ) : (
@@ -263,9 +324,9 @@ const FolderPageClient = ({ data }: { data: FolderWithChildren }) => {
       <Dialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Delete Files</DialogTitle>
+            <DialogTitle>Delete Items</DialogTitle>
             <DialogDescription>
-              Are you sure you want to delete {selectedFiles.size} file{selectedFiles.size !== 1 ? "s" : ""}? This action cannot be undone.
+              Are you sure you want to delete {selectedFiles.size} file{selectedFiles.size !== 1 ? "s" : ""} and {selectedFolders.size} folder{selectedFolders.size !== 1 ? "s" : ""}? This action cannot be undone.
             </DialogDescription>
           </DialogHeader>
           <DialogFooter>
@@ -347,38 +408,41 @@ const FolderPageClient = ({ data }: { data: FolderWithChildren }) => {
       <Dialog open={showMoveDialog} onOpenChange={setShowMoveDialog}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Move Files</DialogTitle>
+            <DialogTitle>Move Items</DialogTitle>
             <DialogDescription>
-              Select a folder to move {selectedFiles.size} file{selectedFiles.size !== 1 ? "s" : ""} to.
+              Select a folder to move {selectedFiles.size} file{selectedFiles.size !== 1 ? "s" : ""} and {selectedFolders.size} folder{selectedFolders.size !== 1 ? "s" : ""} to.
             </DialogDescription>
           </DialogHeader>
           <div className="flex flex-col gap-4">
-            <Select
-              value={targetFolderId?.toString()}
-              onValueChange={(value) => setTargetFolderId(Number(value))}
-            >
-              <SelectTrigger>
-                <SelectValue placeholder="Select a folder" />
-              </SelectTrigger>
-              <SelectContent>
-                {data.children.map((folder) => (
-                  <SelectItem key={folder.id} value={folder.id.toString()}>
-                    {folder.title}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+            <div className="flex flex-col gap-2">
+              <label className="text-sm font-medium">Destination Folder</label>
+              <Select
+                value={targetFolderId?.toString()}
+                onValueChange={(value) => setTargetFolderId(Number(value))}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Select a folder" />
+                </SelectTrigger>
+                <SelectContent>
+                  {rootFolder && (
+                    <SelectItem value={rootFolder.id.toString()}>
+                      {rootFolder.title}
+                    </SelectItem>
+                  )}
+                  {data.children.map((folder) => (
+                    <SelectItem key={folder.id} value={folder.id.toString()}>
+                      {folder.title}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setShowMoveDialog(false)}>
               Cancel
             </Button>
-            <Button 
-              onClick={handleMove}
-              disabled={!targetFolderId}
-            >
-              Move
-            </Button>
+            <Button onClick={handleMove}>Move</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

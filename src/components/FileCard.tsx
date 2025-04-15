@@ -15,6 +15,8 @@ import { cn, formatFileSize } from "~/lib/utils";
 import { deleteFile } from "~/server/actions/file_action";
 import EditFileForm from "./forms/EditFileForm";
 import Image from "next/image";
+import { useRole } from "~/hooks/use-role";
+import { Role } from "@prisma/client";
 
 type Props = {
   data: FileData & {
@@ -29,6 +31,7 @@ const FileCard = ({ data, isSelecting, isSelected, onSelect }: Props) => {
   const [isPending, startTransition] = useTransition();
   const { toast } = useToast();
   const queryClient = useQueryClient();
+  const { role } = useRole();
 
   const handleClick = (e: React.MouseEvent) => {
     if (isSelecting && onSelect) {
@@ -75,6 +78,9 @@ const FileCard = ({ data, isSelecting, isSelected, onSelect }: Props) => {
     }
   };
 
+  const canEdit = role === Role.EDITOR || role === Role.ADMINISTRATOR;
+  const canDelete = role === Role.EDITOR || role === Role.ADMINISTRATOR;
+
   return (
     <a
       href={data.webViewLink}
@@ -98,42 +104,11 @@ const FileCard = ({ data, isSelecting, isSelected, onSelect }: Props) => {
             onError={(e) => {
               const target = e.target as HTMLImageElement;
               target.style.display = "none";
-              const fallback = document.createElement("div");
-              fallback.className = "flex h-full items-center justify-center";
-              fallback.innerHTML = '<span class="text-4xl">🖼️</span>';
-              target.parentNode?.appendChild(fallback);
             }}
           />
-        ) : data.mimeType?.startsWith("video/") ? (
-          <div className="flex h-full items-center justify-center">
-            <span className="text-4xl">🎬</span>
-          </div>
-        ) : data.mimeType?.startsWith("audio/") ? (
-          <div className="flex h-full items-center justify-center">
-            <span className="text-4xl">🎵</span>
-          </div>
-        ) : data.mimeType?.includes("pdf") ? (
-          <div className="flex h-full items-center justify-center">
-            <span className="text-4xl">📄</span>
-          </div>
-        ) : data.mimeType?.includes("word") ||
-          data.mimeType?.includes("document") ? (
-          <div className="flex h-full items-center justify-center">
-            <span className="text-4xl">📝</span>
-          </div>
-        ) : data.mimeType?.includes("spreadsheet") ||
-          data.mimeType?.includes("excel") ? (
-          <div className="flex h-full items-center justify-center">
-            <span className="text-4xl">📊</span>
-          </div>
-        ) : data.mimeType?.includes("presentation") ||
-          data.mimeType?.includes("powerpoint") ? (
-          <div className="flex h-full items-center justify-center">
-            <span className="text-4xl">📑</span>
-          </div>
         ) : (
-          <div className="flex h-full items-center justify-center">
-            <span className="text-4xl">📁</span>
+          <div className="flex h-full w-full items-center justify-center">
+            <img src={data.iconLink} alt={data.title} className="h-12 w-12" />
           </div>
         )}
         {isSelecting && (
@@ -149,41 +124,42 @@ const FileCard = ({ data, isSelecting, isSelected, onSelect }: Props) => {
       </div>
 
       <div className="flex flex-col gap-1">
-        <h3 className="line-clamp-1 text-sm font-medium">{data.title}</h3>
+        <h3 className="line-clamp-2 text-sm font-medium">{data.title}</h3>
         <p className="text-xs text-muted-foreground">
           {formatFileSize(data.fileSize)}
         </p>
       </div>
 
-      {!isSelecting && (
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <Button
-              variant="ghost"
-              size="icon"
-              className="absolute right-2 top-2 size-6 rounded-full"
-              onClick={(e) => e.stopPropagation()}
-            >
-              <EllipsisVertical className="size-4" />
-            </Button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="end" className="w-44">
-            <DropdownMenuItem asChild>
-              <EditFileForm data={data} />
-            </DropdownMenuItem>
-            <DropdownMenuItem
-              className="flex items-center gap-2 text-red-600 focus:bg-red-50 focus:text-red-600 dark:focus:bg-red-950"
-              onClick={(e) => {
-                e.preventDefault();
-                e.stopPropagation();
-                startTransition(handleDelete);
-              }}
-            >
-              <Trash className="h-4 w-4" />
-              <span>Delete</span>
-            </DropdownMenuItem>
-          </DropdownMenuContent>
-        </DropdownMenu>
+      {(canEdit || canDelete) && (
+        <div className="absolute right-2 top-2 opacity-0 transition-opacity group-hover:opacity-100">
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-8 w-8 rounded-full"
+              >
+                <EllipsisVertical className="h-4 w-4" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              {canEdit && (
+                <DropdownMenuItem asChild>
+                  <EditFileForm data={data} />
+                </DropdownMenuItem>
+              )}
+              {canDelete && (
+                <DropdownMenuItem
+                  className="text-destructive"
+                  onClick={handleDelete}
+                >
+                  <Trash className="mr-2 h-4 w-4" />
+                  Delete
+                </DropdownMenuItem>
+              )}
+            </DropdownMenuContent>
+          </DropdownMenu>
+        </div>
       )}
     </a>
   );

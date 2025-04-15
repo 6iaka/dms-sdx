@@ -1,7 +1,7 @@
 "server only";
 
 import type { Category, Prisma } from "@prisma/client";
-import { db } from "../db";
+import { prisma } from "../db";
 
 export class FileService {
   /**
@@ -10,7 +10,7 @@ export class FileService {
    */
   findMany = async () => {
     try {
-      const files = await db.file.findMany({
+      const files = await prisma.file.findMany({
         orderBy: { createdAt: "desc" },
         include: {
           tags: true,
@@ -30,8 +30,28 @@ export class FileService {
    */
   findById = async (id: number) => {
     try {
-      const file = await db.file.findUnique({
+      const file = await prisma.file.findUnique({
         where: { id },
+        include: {
+          tags: true,
+          folder: true,
+        },
+      });
+      return file;
+    } catch (error) {
+      throw new Error((error as Error).message);
+    }
+  };
+
+  /**
+   * Get a file by Google ID
+   * @param googleId Google ID of the file to get
+   * @returns File details
+   */
+  findByGoogleId = async (googleId: string) => {
+    try {
+      const file = await prisma.file.findUnique({
+        where: { googleId },
         include: {
           tags: true,
           folder: true,
@@ -50,7 +70,7 @@ export class FileService {
    */
   findByFolderId = async (folderId: number) => {
     try {
-      const files = await db.file.findMany({
+      const files = await prisma.file.findMany({
         where: {
           folder: {
             id: folderId,
@@ -75,7 +95,7 @@ export class FileService {
    */
   findByTag = async (tagName: string) => {
     try {
-      const files = await db.file.findMany({
+      const files = await prisma.file.findMany({
         where: {
           tags: {
             some: {
@@ -103,7 +123,7 @@ export class FileService {
    */
   delete = async (id: number) => {
     try {
-      const deleted = await db.file.delete({ where: { id } });
+      const deleted = await prisma.file.delete({ where: { id } });
       return deleted;
     } catch (error) {
       throw new Error((error as Error).message);
@@ -125,7 +145,7 @@ export class FileService {
     tags?: string[];
   }) => {
     try {
-      const files = await db.file.findMany({
+      const files = await prisma.file.findMany({
         where: {
           AND: [
             {
@@ -165,7 +185,7 @@ export class FileService {
    */
   update = async (id: number, data: Prisma.FileUpdateInput) => {
     try {
-      const updated = await db.file.update({
+      const updated = await prisma.file.update({
         where: { id },
         data,
         include: {
@@ -186,7 +206,7 @@ export class FileService {
    */
   upsert = async (data: Prisma.FileCreateInput) => {
     try {
-      const file = await db.file.upsert({
+      const file = await prisma.file.upsert({
         where: { googleId: data.googleId },
         create: data,
         update: data,
@@ -205,7 +225,7 @@ export class FileService {
    */
   updateMany = async (ids: number[], data: Prisma.FileUpdateInput) => {
     try {
-      const files = await db.file.updateMany({
+      const files = await prisma.file.updateMany({
         where: { id: { in: ids } },
         data,
       });
@@ -223,7 +243,7 @@ export class FileService {
    */
   move = async (fileIds: number[], targetFolderId: number) => {
     try {
-      const updated = await db.file.updateMany({
+      const updated = await prisma.file.updateMany({
         where: { id: { in: fileIds } },
         data: { folderId: targetFolderId },
       });

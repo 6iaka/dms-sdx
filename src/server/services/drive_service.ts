@@ -200,6 +200,42 @@ export class DriveService {
       throw new Error((error as Error).message);
     }
   };
+
+  /**
+   * Move an item to a new folder
+   * @param itemId ID of the item to move
+   * @param targetFolderId ID of the target folder
+   * @returns Updated item details
+   */
+  moveItem = async (itemId: string, targetFolderId: string) => {
+    try {
+      // First get the current parents of the item
+      const file = await this.drive.files.get({
+        fileId: itemId,
+        fields: 'parents',
+      });
+
+      // Remove the item from its current parent(s)
+      if (file.data.parents) {
+        await this.drive.files.update({
+          fileId: itemId,
+          removeParents: file.data.parents.join(','),
+          addParents: targetFolderId,
+        });
+      } else {
+        // If no parents, just add to the new folder
+        await this.drive.files.update({
+          fileId: itemId,
+          addParents: targetFolderId,
+        });
+      }
+
+      return true;
+    } catch (error) {
+      console.error(error);
+      throw new Error((error as Error).message);
+    }
+  };
 }
 
 const driveService = new DriveService();

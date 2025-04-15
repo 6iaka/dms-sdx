@@ -187,3 +187,33 @@ export const toggleFolderFavorite = async (id: number) => {
     };
   }
 };
+
+export const moveFolder = async (folderId: number, targetFolderId: number) => {
+  const user = await currentUser();
+
+  try {
+    if (!user) throw new Error("Not authorized");
+    
+    // Get the source and target folders
+    const sourceFolder = await folderService.findById(folderId);
+    const targetFolder = await folderService.findById(targetFolderId);
+    
+    if (!sourceFolder || !targetFolder) {
+      throw new Error("Source or target folder not found");
+    }
+
+    // Move the folder in Google Drive
+    await driveService.moveItem(sourceFolder.googleId, targetFolder.googleId);
+
+    // Update the folder's parent in the database
+    await folderService.update(folderId, {
+      parent: { connect: { id: targetFolderId } }
+    });
+
+    revalidatePath("/");
+    revalidatePath("/folder/:id", "page");
+  } catch (error) {
+    console.error("Error in moveFolder:", error);
+    throw error;
+  }
+};

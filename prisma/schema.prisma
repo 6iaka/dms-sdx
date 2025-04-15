@@ -55,6 +55,22 @@ model File {
   tags             Tag[]    @relation("FileToTag")
 }
 
+enum Role {
+  VIEWER
+  EDITOR
+  ADMINISTRATOR
+}
+
+model UserRole {
+  id        String   @id @default(cuid())
+  userId    String   @unique
+  role      Role     @default(VIEWER)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([userId])
+}
+
 enum Category {
   IMAGE
   VIDEO

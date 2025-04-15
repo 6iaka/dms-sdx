@@ -1,18 +1,20 @@
 "server only";
 import type { Prisma } from "@prisma/client";
-import { db } from "../db";
+import { prisma } from "../db";
 
 export class FolderService {
   /**
-   * Find Many Folders
-   * @param where Inputs to find the folders by
+   * Get all folders from the database
    * @returns Array of folders
    */
-  findMany = async (where?: Prisma.FolderWhereInput) => {
+  findMany = async () => {
     try {
-      const folders = await db.folder.findMany({
+      const folders = await prisma.folder.findMany({
         orderBy: { createdAt: "desc" },
-        where,
+        include: {
+          files: true,
+          children: true,
+        },
       });
       return folders;
     } catch (error) {
@@ -21,20 +23,16 @@ export class FolderService {
   };
 
   /**
-   * Find folder by ID
-   * @param id ID of the folder to find
-   * @returns folder details
+   * Get a folder by ID
+   * @param id ID of the folder to get
+   * @returns Folder details
    */
   findById = async (id: number) => {
     try {
-      const folder = await db.folder.findUnique({
+      const folder = await prisma.folder.findUnique({
         where: { id },
         include: {
-          files: {
-            include: {
-              tags: true
-            }
-          },
+          files: true,
           children: true,
         },
       });
@@ -45,13 +43,19 @@ export class FolderService {
   };
 
   /**
-   * Find folder by googleId
-   * @param googleId Google ID of the folder to find
-   * @returns folder details
+   * Get a folder by Google ID
+   * @param googleId Google ID of the folder to get
+   * @returns Folder details
    */
   findByGoogleId = async (googleId: string) => {
     try {
-      const folder = await db.folder.findUnique({ where: { googleId } });
+      const folder = await prisma.folder.findUnique({
+        where: { googleId },
+        include: {
+          files: true,
+          children: true,
+        },
+      });
       return folder;
     } catch (error) {
       throw new Error((error as Error).message);
@@ -59,42 +63,40 @@ export class FolderService {
   };
 
   /**
-   * Search folders
-   * @param query Query to find the folders by
-   * @returns List of folders
+   * Get folders by parent ID
+   * @param parentId ID of the parent folder
+   * @returns Array of child folders
    */
-  search = async (query: string) => {
+  findByParentId = async (parentId: number) => {
     try {
-      const results = await db.folder.findMany({
-        where: {
-          OR: [
-            { title: { contains: query, mode: "insensitive" } },
-            { description: { contains: query, mode: "insensitive" } },
-          ],
+      const folders = await prisma.folder.findMany({
+        where: { parentId },
+        include: {
+          files: true,
+          children: true,
         },
         orderBy: { createdAt: "desc" },
-        take: 40,
       });
-
-      return results;
+      return folders;
     } catch (error) {
       throw new Error((error as Error).message);
     }
   };
 
   /**
-   * Upsert folder
-   * @param insertData Data for folder creationg
-   * @returns Upserted folder details
+   * Create a new folder
+   * @param data Folder data to create
+   * @returns Created folder
    */
-  upsert = async (insertData: Prisma.FolderCreateInput) => {
+  create = async (data: Prisma.FolderCreateInput) => {
     try {
-      const folder = await db.folder.upsert({
-        where: { googleId: insertData.googleId },
-        create: insertData,
-        update: insertData,
+      const folder = await prisma.folder.create({
+        data,
+        include: {
+          files: true,
+          children: true,
+        },
       });
-
       return folder;
     } catch (error) {
       throw new Error((error as Error).message);
@@ -102,32 +104,59 @@ export class FolderService {
   };
 
   /**
-   * Update folder
-   * @param id Id of the folder to update
-   * @param updateData Data to be updated
-   * @returns Updated folder details
+   * Update a folder
+   * @param id ID of the folder to update
+   * @param data Data to update the folder with
+   * @returns Updated folder
    */
   update = async (id: number, data: Prisma.FolderUpdateInput) => {
     try {
-      const folder = await db.folder.update({
+      const updated = await prisma.folder.update({
         where: { id },
         data,
+        include: {
+          files: true,
+          children: true,
+        },
       });
-
-      return folder;
+      return updated;
     } catch (error) {
       throw new Error((error as Error).message);
     }
   };
 
   /**
-   * Delete folder
+   * Delete a folder
    * @param id ID of the folder to delete
-   * @returns Deleted folder details
+   * @returns Deleted folder
    */
   delete = async (id: number) => {
     try {
-      const folder = await db.folder.delete({ where: { id } });
+      const deleted = await prisma.folder.delete({
+        where: { id },
+      });
+      return deleted;
+    } catch (error) {
+      throw new Error((error as Error).message);
+    }
+  };
+
+  /**
+   * Upsert a folder
+   * @param data Data to create or update the folder with
+   * @returns Upserted folder
+   */
+  upsert = async (data: Prisma.FolderCreateInput) => {
+    try {
+      const folder = await prisma.folder.upsert({
+        where: { googleId: data.googleId },
+        create: data,
+        update: data,
+        include: {
+          files: true,
+          children: true,
+        },
+      });
       return folder;
     } catch (error) {
       throw new Error((error as Error).message);
@@ -135,24 +164,23 @@ export class FolderService {
   };
 
   /**
-   * Toggle folder favorite status
-   * @param id ID of the folder to toggle favorite
-   * @returns Updated folder details
+   * Move a folder to a different parent
+   * @param folderId ID of the folder to move
+   * @param targetParentId ID of the target parent folder
+   * @returns Updated folder
    */
-  toggleFavorite = async (id: number) => {
+  move = async (folderId: number, targetParentId: number | null) => {
     try {
-      const folder = await db.folder.findUnique({ where: { id } });
-      if (!folder) throw new Error("Folder not found");
-
-      const updated = await db.folder.update({
-        where: { id },
-        data: { isFavorite: !folder.isFavorite },
+      const updated = await prisma.folder.update({
+        where: { id: folderId },
+        data: { parentId: targetParentId },
+        include: {
+          files: true,
+          children: true,
+        },
       });
-      
-      console.log("Folder updated:", updated);
       return updated;
     } catch (error) {
-      console.error("Error in toggleFavorite:", error);
       throw new Error((error as Error).message);
     }
   };
