@@ -19,24 +19,43 @@ export async function getUsers(): Promise<UserWithRole[]> {
   const session = await auth();
   if (!session.userId) throw new Error("Unauthorized");
 
-  // Get all users from Clerk
+  // Get all users from Clerk with their sessions
   const clerk = await clerkClient();
-  const response = await clerk.users.getUserList();
+  const response = await clerk.users.getUserList({
+    limit: 100,
+    orderBy: '-created_at',
+  });
   const clerkUsers = response.data;
   
   // Get user roles from our database
   const userRoles = await prisma.userRole.findMany();
   
+  // Get active sessions
+  const activeSessions = await clerk.sessions.getSessionList();
+  const activeUserIds = new Set(activeSessions.data.map(session => session.userId));
+  
   // Combine the data
   return clerkUsers.map((clerkUser: User) => {
     const userRole = userRoles.find((role) => role.userId === clerkUser.id);
+    
+    // Check if this is the current user or has an active session
+    const isCurrentUser = clerkUser.id === session.userId;
+    const hasActiveSession = activeUserIds.has(clerkUser.id);
+    
+    // Consider user active if:
+    // 1. They are the current user
+    // 2. They have an active session
+    // 3. They have been active in the last 5 minutes
+    const isActive = isCurrentUser || hasActiveSession || (clerkUser.lastActiveAt 
+      ? new Date(clerkUser.lastActiveAt).getTime() > Date.now() - 5 * 60 * 1000 
+      : false);
     
     return {
       id: clerkUser.id,
       username: clerkUser.username,
       email: clerkUser.emailAddresses[0]?.emailAddress ?? "",
       role: userRole?.role ?? Role.VIEWER,
-      isActive: clerkUser.lastActiveAt ? new Date(clerkUser.lastActiveAt).getTime() > Date.now() - 5 * 60 * 1000 : false,
+      isActive,
       lastActiveAt: clerkUser.lastActiveAt ? new Date(clerkUser.lastActiveAt) : null,
     };
   });
