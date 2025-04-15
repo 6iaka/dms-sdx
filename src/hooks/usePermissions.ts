@@ -39,12 +39,22 @@ export function usePermissions() {
   const isEditor = role === EDITOR_ROLE;
   const isAdmin = role === ADMIN_ROLE;
 
+  // Basic permissions
+  const canView = true; // Everyone can view
+  const canSearch = true; // Everyone can search
+  const canViewTags = true; // Everyone can view tags
+
+  // Editor and Admin permissions
   const canEdit = isAdmin || isEditor;
   const canDelete = isAdmin || isEditor;
   const canUpload = isAdmin || isEditor;
   const canSync = isAdmin || isEditor;
+  const canCreateFolders = isAdmin || isEditor;
+  const canSelect = isAdmin || isEditor;
+  const canManageTags = isAdmin || isEditor;
+
+  // Admin only permissions
   const canManageUsers = isAdmin;
-  const canAssignTags = isAdmin || isEditor;
   const canViewUserManagement = isAdmin;
 
   return {
@@ -54,12 +64,20 @@ export function usePermissions() {
     isViewer,
     isEditor,
     isAdmin,
+    // Basic permissions
+    canView,
+    canSearch,
+    canViewTags,
+    // Editor and Admin permissions
     canEdit,
     canDelete,
     canUpload,
     canSync,
+    canCreateFolders,
+    canSelect,
+    canManageTags,
+    // Admin only permissions
     canManageUsers,
-    canAssignTags,
     canViewUserManagement,
   };
 } 

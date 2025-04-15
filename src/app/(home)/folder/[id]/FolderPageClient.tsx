@@ -31,6 +31,7 @@ import { deleteFolder, moveFolder, createRootFolder, findFolderById } from "~/se
 import { getAllTags } from "~/server/actions/tag_action";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Badge } from "~/components/ui/badge";
+import { usePermissions } from "~/hooks/usePermissions";
 
 type FolderWithChildren = Folder & {
   children: Folder[];
@@ -40,6 +41,7 @@ type FolderWithChildren = Folder & {
 const FolderPageClient = ({ data }: { data: FolderWithChildren }) => {
   const { toast } = useToast();
   const queryClient = useQueryClient();
+  const { canSelect, canUpload, canCreateFolders, isViewer } = usePermissions();
   const [isSelecting, setIsSelecting] = useState(false);
   const [selectedItems, setSelectedItems] = useState<number[]>([]);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
@@ -242,44 +244,48 @@ const FolderPageClient = ({ data }: { data: FolderWithChildren }) => {
             </Button>
           )}
 
-          <div className="flex flex-wrap items-center gap-2">
-            {isSelecting && (
-              <>
-                <Button
-                  variant="destructive"
-                  size="sm"
-                  onClick={() => setShowDeleteDialog(true)}
-                >
-                  <Trash className="mr-2 h-4 w-4" />
-                  Delete
-                </Button>
-                <Button
-                  variant="secondary"
-                  size="sm"
-                  onClick={() => setShowTagDialog(true)}
-                >
-                  Assign Tag
-                </Button>
-                <Button
-                  variant="secondary"
-                  size="sm"
-                  onClick={() => setShowMoveDialog(true)}
-                >
-                  Move
-                </Button>
-              </>
-            )}
-            <SelectionMode
-              onSelect={setIsSelecting}
-              onSelectAll={handleSelectAll}
-            />
-            {!isSelecting && (
-              <>
-                <FileUploadForm folderId={data.id} />
-                <CreateFolderForm parentId={data.id} />
-              </>
-            )}
-          </div>
+          {!isViewer && (
+            <div className="flex flex-wrap items-center gap-2">
+              {isSelecting && canSelect && (
+                <>
+                  <Button
+                    variant="destructive"
+                    size="sm"
+                    onClick={() => setShowDeleteDialog(true)}
+                  >
+                    <Trash className="mr-2 h-4 w-4" />
+                    Delete
+                  </Button>
+                  <Button
+                    variant="secondary"
+                    size="sm"
+                    onClick={() => setShowTagDialog(true)}
+                  >
+                    Assign Tag
+                  </Button>
+                  <Button
+                    variant="secondary"
+                    size="sm"
+                    onClick={() => setShowMoveDialog(true)}
+                  >
+                    Move
+                  </Button>
+                </>
+              )}
+              {canSelect && (
+                <SelectionMode
+                  onSelect={setIsSelecting}
+                  onSelectAll={handleSelectAll}
+                />
+              )}
+              {!isSelecting && (
+                <>
+                  {canUpload && <FileUploadForm folderId={data.id} />}
+                  {canCreateFolders && <CreateFolderForm parentId={data.id} />}
+                </>
+              )}
+            </div>
+          )}
         </div>
         <h2 className="text-xl font-bold capitalize">{data.title}</h2>
       </header>
