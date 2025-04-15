@@ -142,9 +142,16 @@ const TagsSection = () => {
 
   // Handle tag edit
   const handleEdit = async () => {
-    if (!tagToEdit || !newTagName) return;
+    if (!tagToEdit || !newTagName || newTagName.trim().length === 0) {
+      toast({
+        title: "Error",
+        description: "Tag name cannot be empty",
+        variant: "destructive",
+      });
+      return;
+    }
     try {
-      const response = await upsertTag(newTagName);
+      const response = await upsertTag(newTagName.trim());
       if (response) {
         toast({ title: "Tag updated successfully" });
         setTagToEdit(null);
@@ -153,7 +160,7 @@ const TagsSection = () => {
           const next = new Set(prev);
           if (next.has(tagToEdit.name)) {
             next.delete(tagToEdit.name);
-            next.add(newTagName);
+            next.add(newTagName.trim());
           }
           return next;
         });
@@ -174,7 +181,8 @@ const TagsSection = () => {
   };
 
   const handleCreateTag = async () => {
-    if (!newTagName || newTagName.trim().length === 0) {
+    const trimmedName = newTagName?.trim() || "";
+    if (trimmedName.length === 0) {
       toast({
         title: "Error",
         description: "Tag name cannot be empty",
@@ -183,7 +191,7 @@ const TagsSection = () => {
       return;
     }
     try {
-      const response = await upsertTag(newTagName.trim());
+      const response = await upsertTag(trimmedName);
       if (response) {
         toast({ title: "Tag created successfully" });
         setNewTagName("");
