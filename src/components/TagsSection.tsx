@@ -166,15 +166,11 @@ const TagsSection = () => {
         });
         await queryClient.invalidateQueries({ queryKey: ["tags"] });
         await queryClient.invalidateQueries({ queryKey: ["files"] });
-      } else {
-        toast({
-          title: "Error updating tag",
-          variant: "destructive",
-        });
       }
-    } catch {
+    } catch (error) {
       toast({
         title: "Error updating tag",
+        description: error instanceof Error ? error.message : "Failed to update tag",
         variant: "destructive",
       });
     }
@@ -196,15 +192,11 @@ const TagsSection = () => {
         toast({ title: "Tag created successfully" });
         setNewTagName("");
         await queryClient.invalidateQueries({ queryKey: ["tags"] });
-      } else {
-        toast({
-          title: "Error creating tag",
-          variant: "destructive",
-        });
       }
-    } catch {
+    } catch (error) {
       toast({
         title: "Error creating tag",
+        description: error instanceof Error ? error.message : "Failed to create tag",
         variant: "destructive",
       });
     }

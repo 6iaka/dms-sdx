@@ -1,9 +1,9 @@
 "use client";
 
 import { useAuth } from "@clerk/nextjs";
-import { useEffect, useState } from "react";
 import { Role } from "@prisma/client";
 import { getUserRole } from "~/server/actions/user_action";
+import { useQuery } from "@tanstack/react-query";
 
 const ADMIN_ROLE: Role = Role.ADMINISTRATOR;
 const EDITOR_ROLE: Role = Role.EDITOR;
@@ -11,29 +11,16 @@ const VIEWER_ROLE: Role = Role.VIEWER;
 
 export function usePermissions() {
   const { userId } = useAuth();
-  const [role, setRole] = useState<Role | null>(null);
-  const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
-    async function fetchRole() {
-      if (!userId) {
-        setLoading(false);
-        return;
-      }
-
-      try {
-        const userRole = await getUserRole(userId);
-        setRole(userRole);
-      } catch (error) {
-        console.error("Error fetching user role:", error);
-        setRole(null);
-      } finally {
-        setLoading(false);
-      }
-    }
-
-    void fetchRole();
-  }, [userId]);
+  const { data: role, isLoading } = useQuery({
+    queryKey: ["userRole", userId],
+    queryFn: async () => {
+      if (!userId) return null;
+      return await getUserRole(userId);
+    },
+    staleTime: 1000 * 60 * 5, // Cache for 5 minutes
+    gcTime: 1000 * 60 * 30, // Keep in cache for 30 minutes
+  });
 
   const isViewer = role === VIEWER_ROLE;
   const isEditor = role === EDITOR_ROLE;
@@ -59,8 +46,7 @@ export function usePermissions() {
 
   return {
     role,
-    setRole,
-    loading,
+    loading: isLoading,
     isViewer,
     isEditor,
     isAdmin,

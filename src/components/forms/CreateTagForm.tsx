@@ -24,7 +24,7 @@ import { upsertTag } from "~/server/actions/tag_action";
 import { useQueryClient } from "@tanstack/react-query";
 
 const formSchema = z.object({
-  name: z.string().trim().toLowerCase(),
+  name: z.string().trim().min(1, "Tag name cannot be empty").toLowerCase(),
 });
 
 const CreateTagForm = () => {
