@@ -174,7 +174,7 @@ const TagsSection = () => {
   };
 
   const handleCreateTag = async () => {
-    if (!newTagName.trim()) {
+    if (!newTagName || newTagName.trim().length === 0) {
       toast({
         title: "Error",
         description: "Tag name cannot be empty",
@@ -183,7 +183,7 @@ const TagsSection = () => {
       return;
     }
     try {
-      const response = await upsertTag(newTagName);
+      const response = await upsertTag(newTagName.trim());
       if (response) {
         toast({ title: "Tag created successfully" });
         setNewTagName("");
@@ -227,7 +227,6 @@ const TagsSection = () => {
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               className="max-w-sm"
-              autoFocus
             />
           </div>
 
