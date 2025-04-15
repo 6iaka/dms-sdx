@@ -180,13 +180,19 @@ const TagsSection = () => {
           <TagIcon className="h-5 w-5" />
         </Button>
       </DialogTrigger>
-      <DialogContent className="sm:max-w-[800px]">
+      <DialogContent className={cn(
+        "sm:max-w-[800px]",
+        selectedTags.size > 0 ? "h-[80vh] mt-4" : "h-auto"
+      )}>
         <DialogHeader>
           <DialogTitle>Tags</DialogTitle>
         </DialogHeader>
-        <div className="flex h-[600px] flex-col gap-4">
-          {/* Search Input */}
-          <div className="flex items-center gap-2">
+        <div className={cn(
+          "flex flex-col gap-4 overflow-hidden",
+          selectedTags.size > 0 ? "h-[calc(100%-3rem)]" : "h-auto"
+        )}>
+          {/* Search Input - Fixed at top */}
+          <div className="flex-shrink-0">
             <Input
               placeholder="Search tags..."
               value={searchQuery}
@@ -195,8 +201,8 @@ const TagsSection = () => {
             />
           </div>
 
-          {/* Tags Grid */}
-          <div className="grid grid-cols-2 gap-2">
+          {/* Tags Grid - Scrollable */}
+          <div className="grid grid-cols-2 gap-2 overflow-y-auto max-h-[200px]">
             {sortedAndFilteredTags?.map((tag) => (
               <Badge
                 key={tag.id}
@@ -257,10 +263,10 @@ const TagsSection = () => {
             ))}
           </div>
 
-          {/* Files Section */}
+          {/* Files Section - Scrollable when tags are selected */}
           {selectedTags.size > 0 && (
-            <div className="flex flex-1 flex-col gap-2 overflow-hidden">
-              <h3 className="text-balance font-medium">
+            <div className="flex-1 flex flex-col gap-2 min-h-0 overflow-hidden">
+              <h3 className="text-balance font-medium flex-shrink-0">
                 Files with tags: {Array.from(selectedTags).map((tag, index) => (
                   <span key={tag}>
                     &quot;{tag}&quot;
@@ -269,7 +275,7 @@ const TagsSection = () => {
                 ))}
               </h3>
               <div className="flex-1 overflow-y-auto">
-                <div className="grid w-full grid-cols-[repeat(auto-fill,minmax(9rem,1fr))] gap-2">
+                <div className="grid w-full grid-cols-[repeat(auto-fill,minmax(9rem,1fr))] gap-2 pb-4">
                   {isLoading ? (
                     <div className="col-span-full flex justify-center py-8">
                       <Loader2 className="h-8 w-8 animate-spin" />
