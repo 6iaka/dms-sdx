@@ -1,25 +1,29 @@
 "use client";
-import type { File as FileData, Tag, Role } from "@prisma/client";
-import { useQueryClient } from "@tanstack/react-query";
-import { EllipsisVertical, Trash } from "lucide-react";
-import { Button } from "~/components/ui/button";
+import type { File } from "@prisma/client";
+import { useQuery } from "@tanstack/react-query";
+import { useState } from "react";
+import { toast } from "sonner";
+import { usePermissions } from "~/hooks/usePermissions";
+import { deleteFile } from "~/server/actions/file_action";
+import { cn, formatFileSize } from "~/lib/utils";
+import { Card } from "~/components/ui/card";
+import { Checkbox } from "~/components/ui/checkbox";
+import { MoreVertical, Trash2 } from "lucide-react";
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "~/components/ui/dropdown-menu";
-import { useToast } from "~/hooks/use-toast";
-import { cn, formatFileSize } from "~/lib/utils";
-import { deleteFile } from "~/server/actions/file_action";
+import { EllipsisVertical, Trash } from "lucide-react";
+import { Button } from "~/components/ui/button";
 import EditFileForm from "./forms/EditFileForm";
 import Image from "next/image";
 import { useRole } from "~/hooks/use-role";
-import { useState } from "react";
 import { useRouter } from "next/navigation";
 
 type Props = {
-  data: FileData & {
+  data: File & {
     tags: Tag[];
   };
   isSelecting?: boolean;
@@ -28,8 +32,6 @@ type Props = {
 };
 
 const FileCard = ({ data, isSelecting, isSelected, onSelect }: Props) => {
-  const { toast } = useToast();
-  const queryClient = useQueryClient();
   const { role } = useRole();
   const router = useRouter();
   const [isHovered, setIsHovered] = useState(false);
@@ -51,7 +53,6 @@ const FileCard = ({ data, isSelecting, isSelected, onSelect }: Props) => {
         title: "Success",
         description: "File deleted successfully",
       });
-      await queryClient.invalidateQueries({ queryKey: ["files"] });
     } catch (error) {
       console.error("Error deleting file:", error);
       const errorMessage =
