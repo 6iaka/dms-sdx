@@ -56,6 +56,11 @@ const FolderPageClient = ({ data }: { data: FolderWithChildren }) => {
     queryFn: async () => await getAllTags(),
   });
 
+  const { data: filesData, isLoading: isLoadingFiles } = useQuery({
+    queryKey: ["files", data.id],
+    queryFn: () => getFiles(data.id),
+  });
+
   // Fetch root folder
   useEffect(() => {
     const fetchRootFolder = async () => {

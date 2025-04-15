@@ -32,7 +32,7 @@ type Props = {
 };
 
 const FileCard = ({ data, isSelecting, isSelected, onSelect }: Props) => {
-  const { role } = useRole();
+  const { canEdit, canDelete } = usePermissions();
   const router = useRouter();
   const [isHovered, setIsHovered] = useState(false);
 
@@ -47,6 +47,7 @@ const FileCard = ({ data, isSelecting, isSelected, onSelect }: Props) => {
   };
 
   const handleDelete = async () => {
+    if (!canDelete) return;
     try {
       await deleteFile(data.id);
       toast.success("File deleted successfully");
@@ -65,22 +66,18 @@ const FileCard = ({ data, isSelecting, isSelected, onSelect }: Props) => {
     }
   };
 
-  const canEdit = role === "EDITOR" || role === "ADMINISTRATOR";
-  const canDelete = role === "EDITOR" || role === "ADMINISTRATOR";
-
   return (
-    <div
-      className="relative group"
+    <Card
+      className={cn(
+        "group relative overflow-hidden transition-all hover:shadow-md",
+        isSelected && "ring-2 ring-primary"
+      )}
       onMouseEnter={() => setIsHovered(true)}
       onMouseLeave={() => setIsHovered(false)}
     >
       <div
+        className="relative aspect-square cursor-pointer"
         onClick={handleClick}
-        className={cn(
-          "group relative flex flex-col gap-2 rounded-lg bg-card p-2 transition-all hover:bg-secondary/25",
-          isSelecting && "cursor-pointer",
-          isSelected && "bg-primary/10 hover:bg-primary/20"
-        )}
       >
         <div className="relative aspect-square w-full overflow-hidden rounded-lg bg-muted">
           {data.mimeType?.startsWith("image/") ? (
@@ -117,47 +114,43 @@ const FileCard = ({ data, isSelecting, isSelected, onSelect }: Props) => {
             </div>
           )}
         </div>
-
-        <div className="flex flex-col gap-1">
-          <h3 className="line-clamp-2 text-sm font-medium">{data.title}</h3>
-          <p className="text-xs text-muted-foreground">
-            {formatFileSize(data.fileSize)}
-          </p>
-        </div>
-
-        {(canEdit || canDelete) && (
-          <div className="absolute right-2 top-2 opacity-0 transition-opacity group-hover:opacity-100">
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className="h-8 w-8 rounded-full"
-                >
-                  <EllipsisVertical className="h-4 w-4" />
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end">
-                {canEdit && (
-                  <DropdownMenuItem asChild>
-                    <EditFileForm data={data} />
-                  </DropdownMenuItem>
-                )}
-                {canDelete && (
-                  <DropdownMenuItem
-                    className="text-destructive"
-                    onClick={handleDelete}
-                  >
-                    <Trash className="mr-2 h-4 w-4" />
-                    Delete
-                  </DropdownMenuItem>
-                )}
-              </DropdownMenuContent>
-            </DropdownMenu>
-          </div>
-        )}
       </div>
-    </div>
+
+      <div className="p-2">
+        <h3 className="line-clamp-2 text-sm font-medium">{data.title}</h3>
+        <p className="text-xs text-muted-foreground">
+          {formatFileSize(data.fileSize)}
+        </p>
+      </div>
+
+      {(canEdit || canDelete) && (
+        <div className="absolute right-2 top-2 opacity-0 transition-opacity group-hover:opacity-100">
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="ghost" size="icon">
+                <MoreVertical className="h-4 w-4" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              {canEdit && (
+                <DropdownMenuItem asChild>
+                  <EditFileForm data={data} />
+                </DropdownMenuItem>
+              )}
+              {canDelete && (
+                <DropdownMenuItem
+                  className="text-destructive"
+                  onClick={handleDelete}
+                >
+                  <Trash2 className="mr-2 h-4 w-4" />
+                  Delete
+                </DropdownMenuItem>
+              )}
+            </DropdownMenuContent>
+          </DropdownMenu>
+        </div>
+      )}
+    </Card>
   );
 };
 

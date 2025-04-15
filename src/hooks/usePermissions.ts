@@ -7,6 +7,7 @@ import { getUserRole } from "~/server/actions/user_action";
 
 const ADMIN_ROLE: Role = Role.ADMINISTRATOR;
 const EDITOR_ROLE: Role = Role.EDITOR;
+const VIEWER_ROLE: Role = Role.VIEWER;
 
 export function usePermissions() {
   const { userId } = useAuth();
@@ -34,22 +35,31 @@ export function usePermissions() {
     void fetchRole();
   }, [userId]);
 
-  const canEdit = role === ADMIN_ROLE || role === EDITOR_ROLE;
-  const canDelete = role === ADMIN_ROLE || role === EDITOR_ROLE;
-  const canSync = role === ADMIN_ROLE || role === EDITOR_ROLE;
-  const canManageUsers = role === ADMIN_ROLE;
-  const canAssignTags = role === ADMIN_ROLE || role === EDITOR_ROLE;
+  const isViewer = role === VIEWER_ROLE;
+  const isEditor = role === EDITOR_ROLE;
   const isAdmin = role === ADMIN_ROLE;
+
+  const canEdit = isAdmin || isEditor;
+  const canDelete = isAdmin || isEditor;
+  const canUpload = isAdmin || isEditor;
+  const canSync = isAdmin || isEditor;
+  const canManageUsers = isAdmin;
+  const canAssignTags = isAdmin || isEditor;
+  const canViewUserManagement = isAdmin;
 
   return {
     role,
     setRole,
     loading,
+    isViewer,
+    isEditor,
+    isAdmin,
     canEdit,
     canDelete,
+    canUpload,
     canSync,
     canManageUsers,
     canAssignTags,
-    isAdmin
+    canViewUserManagement,
   };
 } 

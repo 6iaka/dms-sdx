@@ -28,6 +28,8 @@ import {
 import { Input } from "~/components/ui/input";
 import { Label } from "~/components/ui/label";
 import type { File as FileData, Category } from "@prisma/client";
+import { type Tag } from "@prisma/client";
+import { cn } from "~/lib/utils";
 
 type File = FileData & {
   folder: {

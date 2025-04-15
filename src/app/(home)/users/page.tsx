@@ -4,7 +4,6 @@ import { useEffect, useState } from "react";
 import type { UserWithRole } from "~/server/actions/user_action";
 import { getUsers, updateUserRole } from "~/server/actions/user_action";
 import { Role } from "@prisma/client";
-import { Button } from "~/components/ui/button";
 import {
   Select,
   SelectContent,

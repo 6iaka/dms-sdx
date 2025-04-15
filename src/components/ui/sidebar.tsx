@@ -3,7 +3,9 @@
 import * as React from "react";
 import { Slot } from "@radix-ui/react-slot";
 import { type VariantProps, cva } from "class-variance-authority";
-import { PanelLeft } from "lucide-react";
+import { PanelLeft, Users } from "lucide-react";
+import Link from "next/link";
+import { usePermissions } from "~/hooks/usePermissions";
 
 import { useIsMobile } from "~/hooks/use-mobile";
 import { cn } from "~/lib/utils";
@@ -417,16 +419,28 @@ const SidebarContent = React.forwardRef<
   HTMLDivElement,
   React.ComponentProps<"div">
 >(({ className, ...props }, ref) => {
+  const { canViewUserManagement } = usePermissions();
+  
   return (
-    <div
-      ref={ref}
-      data-sidebar="content"
-      className={cn(
-        "flex min-h-0 flex-1 flex-col gap-2 overflow-auto group-data-[collapsible=icon]:overflow-hidden",
-        className,
+    <div className="flex h-full flex-col gap-4 p-4">
+      {/* ... existing sidebar items ... */}
+      
+      {canViewUserManagement && (
+        <div className="mt-auto">
+          <Separator className="my-4" />
+          <Button
+            variant="ghost"
+            className="w-full justify-start"
+            asChild
+          >
+            <Link href="/users">
+              <Users className="mr-2 h-4 w-4" />
+              User Management
+            </Link>
+          </Button>
+        </div>
       )}
-      {...props}
-    />
+    </div>
   );
 });
 SidebarContent.displayName = "SidebarContent";
