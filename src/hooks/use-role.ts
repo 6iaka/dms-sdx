@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { Role } from "@prisma/client";
 import { useAuth } from "@clerk/nextjs";
-import { prisma } from "~/server/db";
+import { getUserRole } from "~/server/actions/user_action";
 
 export function useRole() {
   const { userId } = useAuth();
@@ -10,7 +10,10 @@ export function useRole() {
 
   useEffect(() => {
     async function fetchRole() {
-      if (!userId) return;
+      if (!userId) {
+        setLoading(false);
+        return;
+      }
       
       try {
         // In development, always return ADMINISTRATOR
@@ -20,11 +23,8 @@ export function useRole() {
           return;
         }
 
-        const userRole = await prisma.userRole.findUnique({
-          where: { userId },
-        });
-        
-        setRole(userRole?.role ?? Role.VIEWER);
+        const userRole = await getUserRole(userId);
+        setRole(userRole ?? Role.VIEWER);
       } catch (error) {
         console.error("Error fetching user role:", error);
         setRole(Role.VIEWER);
@@ -33,7 +33,7 @@ export function useRole() {
       }
     }
 
-    fetchRole();
+    void fetchRole();
   }, [userId]);
 
   return { role, loading };
