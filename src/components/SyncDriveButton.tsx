@@ -1,34 +1,60 @@
-import { RefreshCcw } from "lucide-react";
+import { RefreshCcw, Loader2 } from "lucide-react";
 import { Button } from "./ui/button";
 import { useTransition } from "react";
 import { syncDrive } from "~/server/actions/admin_action";
 import { useToast } from "~/hooks/use-toast";
+import { useState } from "react";
 
-const SyncDriveButton = () => {
-  const [isPending, startTransition] = useTransition();
+export function SyncDriveButton() {
+  const [isSyncing, setIsSyncing] = useState(false);
   const { toast } = useToast();
+
+  const handleSync = async () => {
+    setIsSyncing(true);
+    try {
+      const result = await syncDrive();
+      if (result.success) {
+        toast({
+          title: "Drive Sync",
+          description: result.message,
+          variant: "default",
+        });
+      } else {
+        toast({
+          title: "Sync Failed",
+          description: result.message,
+          variant: "destructive",
+        });
+      }
+    } catch (error) {
+      toast({
+        title: "Sync Failed",
+        description: "An unexpected error occurred while syncing",
+        variant: "destructive",
+      });
+    } finally {
+      setIsSyncing(false);
+    }
+  };
 
   return (
     <Button
-      variant={"ghost"}
-      className="rounded-full"
-      size={"sm"}
-      disabled={isPending}
-      onClick={() =>
-        startTransition(async () => {
-          const result = await syncDrive();
-          toast({
-            title: result.success ? "Success" : "Error",
-            description: result.message,
-            variant: result.success ? "default" : "destructive",
-          });
-        })
-      }
+      variant="outline"
+      size="sm"
+      onClick={handleSync}
+      disabled={isSyncing}
     >
-      <RefreshCcw className={isPending ? "animate-spin" : ""} />
-      Sync Drive
+      {isSyncing ? (
+        <>
+          <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+          Syncing...
+        </>
+      ) : (
+        <>
+          <RefreshCcw className="mr-2 h-4 w-4" />
+          Sync Drive
+        </>
+      )}
     </Button>
   );
-};
-
-export default SyncDriveButton;
+}

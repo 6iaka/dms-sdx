@@ -99,9 +99,12 @@ export const syncDrive = async () => {
 
     // Process files in larger batches
     const batchSize = 50;
+    let syncedCount = 0;
+    let errorCount = 0;
+
     for (let i = 0; i < fileItems.length; i += batchSize) {
       const batch = fileItems.slice(i, i + batchSize);
-      await Promise.allSettled(
+      const results = await Promise.allSettled(
         batch.map((item) =>
           limit(async () => {
             try {
@@ -153,7 +156,7 @@ export const syncDrive = async () => {
 
               // Only update if the file exists, don't create new ones
               if (existingFile) {
-                return await fileService.update(existingFile.id, {
+                await fileService.update(existingFile.id, {
                   folder: { connect: { googleId: parentFolder } },
                   iconLink: item.iconLink?.replace("16", "64") || "",
                   originalFilename: item.originalFilename!,
@@ -168,9 +171,10 @@ export const syncDrive = async () => {
                   categeory: category,
                   title: item.name!,
                 });
+                syncedCount++;
               } else {
                 // Create new file if it doesn't exist
-                return await fileService.upsert({
+                await fileService.upsert({
                   folder: { connect: { googleId: parentFolder } },
                   iconLink: item.iconLink?.replace("16", "64") || "",
                   originalFilename: item.originalFilename!,
@@ -186,18 +190,34 @@ export const syncDrive = async () => {
                   title: item.name!,
                   googleId: item.id!,
                 });
+                syncedCount++;
               }
             } catch (error) {
               console.error("Error syncing file:", error);
+              errorCount++;
             }
           })
         )
       );
+
+      // Check if we're approaching the timeout limit
+      if (i + batchSize < fileItems.length) {
+        // If we have more files to process, return a partial success
+        revalidatePath("/");
+        revalidatePath("/folder/:id", "page");
+        return { 
+          success: true, 
+          message: `Synced ${syncedCount} files (${errorCount} errors). More files to process...` 
+        };
+      }
     }
 
     revalidatePath("/");
     revalidatePath("/folder/:id", "page");
-    return { success: true, message: "Drive synced successfully" };
+    return { 
+      success: true, 
+      message: `Drive sync completed. ${syncedCount} files synced${errorCount > 0 ? ` (${errorCount} errors)` : ''}` 
+    };
   } catch (error) {
     console.error("Error in syncDrive:", error);
     return { 
