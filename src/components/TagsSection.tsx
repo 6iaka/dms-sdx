@@ -221,7 +221,7 @@ const TagsSection = () => {
           selectedTags.size > 0 ? "h-[calc(100%-3rem)]" : "h-auto"
         )}>
           {/* Search Input - Fixed at top */}
-          <div className="flex-shrink-0">
+          <div className="flex-shrink-0 ml-4 mt-2">
             <Input
               placeholder="Search tags..."
               value={searchQuery}
