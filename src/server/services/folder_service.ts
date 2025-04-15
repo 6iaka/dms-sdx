@@ -32,7 +32,11 @@ export class FolderService {
       const folder = await prisma.folder.findUnique({
         where: { id },
         include: {
-          files: true,
+          files: {
+            include: {
+              tags: true,
+            },
+          },
           children: true,
         },
       });
