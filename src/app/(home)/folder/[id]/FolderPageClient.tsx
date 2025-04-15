@@ -26,7 +26,7 @@ import {
   SelectValue,
 } from "~/components/ui/select";
 import { useToast } from "~/hooks/use-toast";
-import { deleteFile, assignTagToFiles, moveFiles } from "~/server/actions/file_action";
+import { deleteFile, assignTagToFiles, moveFiles, getFiles } from "~/server/actions/file_action";
 import { deleteFolder, moveFolder, createRootFolder, findFolderById } from "~/server/actions/folder_action";
 import { getAllTags } from "~/server/actions/tag_action";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
