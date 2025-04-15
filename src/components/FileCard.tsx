@@ -1,5 +1,5 @@
 "use client";
-import type { File } from "@prisma/client";
+import { type File, type Tag } from "@prisma/client";
 import { useQuery } from "@tanstack/react-query";
 import { useState } from "react";
 import { toast } from "sonner";
