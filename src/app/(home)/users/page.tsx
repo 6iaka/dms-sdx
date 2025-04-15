@@ -77,7 +77,7 @@ export default function UsersPage() {
                 <td className="px-6 py-4 whitespace-nowrap">
                   <Select
                     value={user.role}
-                    onValueChange={(value) => handleRoleChange(user.id, value as Role)}
+                    onValueChange={(value) => handleRoleChange(user.id, Role[value as keyof typeof Role])}
                   >
                     <SelectTrigger className="w-[180px] bg-gray-700 text-white">
                       <SelectValue placeholder="Select role" />
