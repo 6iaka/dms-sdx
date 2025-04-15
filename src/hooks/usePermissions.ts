@@ -5,6 +5,9 @@ import { useEffect, useState } from "react";
 import { Role } from "@prisma/client";
 import { getUserRole } from "~/server/actions/user_action";
 
+const ADMIN_ROLE: Role = Role.ADMINISTRATOR;
+const EDITOR_ROLE: Role = Role.EDITOR;
+
 export function usePermissions() {
   const { userId } = useAuth();
   const [role, setRole] = useState<Role | null>(null);
@@ -31,12 +34,12 @@ export function usePermissions() {
     void fetchRole();
   }, [userId]);
 
-  const canEdit = role === Role.ADMINISTRATOR || role === Role.EDITOR;
-  const canDelete = role === Role.ADMINISTRATOR || role === Role.EDITOR;
-  const canSync = role === Role.ADMINISTRATOR || role === Role.EDITOR;
-  const canManageUsers = role === Role.ADMINISTRATOR;
-  const canAssignTags = role === Role.ADMINISTRATOR || role === Role.EDITOR;
-  const isAdmin = role === Role.ADMINISTRATOR;
+  const canEdit = role === ADMIN_ROLE || role === EDITOR_ROLE;
+  const canDelete = role === ADMIN_ROLE || role === EDITOR_ROLE;
+  const canSync = role === ADMIN_ROLE || role === EDITOR_ROLE;
+  const canManageUsers = role === ADMIN_ROLE;
+  const canAssignTags = role === ADMIN_ROLE || role === EDITOR_ROLE;
+  const isAdmin = role === ADMIN_ROLE;
 
   return {
     role,

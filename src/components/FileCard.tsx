@@ -1,5 +1,5 @@
 "use client";
-import type { File as FileData, Tag } from "@prisma/client";
+import type { File as FileData, Tag, Role } from "@prisma/client";
 import { useQueryClient } from "@tanstack/react-query";
 import { EllipsisVertical, Trash } from "lucide-react";
 import { Button } from "~/components/ui/button";
@@ -15,7 +15,6 @@ import { deleteFile } from "~/server/actions/file_action";
 import EditFileForm from "./forms/EditFileForm";
 import Image from "next/image";
 import { useRole } from "~/hooks/use-role";
-import { Role } from "@prisma/client";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 
@@ -82,8 +81,8 @@ const FileCard = ({ data, isSelecting, isSelected, onSelect }: Props) => {
     }
   };
 
-  const canEdit = role === Role.EDITOR || role === Role.ADMINISTRATOR;
-  const canDelete = role === Role.EDITOR || role === Role.ADMINISTRATOR;
+  const canEdit = role === "EDITOR" || role === "ADMINISTRATOR";
+  const canDelete = role === "EDITOR" || role === "ADMINISTRATOR";
 
   return (
     <div
@@ -95,7 +94,8 @@ const FileCard = ({ data, isSelecting, isSelected, onSelect }: Props) => {
         onClick={handleClick}
         className={cn(
           "group relative flex flex-col gap-2 rounded-lg bg-card p-2 transition-all hover:bg-secondary/25",
-          isSelecting && "cursor-pointer"
+          isSelecting && "cursor-pointer",
+          isSelected && "bg-primary/10 hover:bg-primary/20"
         )}
       >
         <div className="relative aspect-square w-full overflow-hidden rounded-lg bg-muted">
@@ -113,7 +113,13 @@ const FileCard = ({ data, isSelecting, isSelected, onSelect }: Props) => {
             />
           ) : (
             <div className="flex h-full w-full items-center justify-center">
-              <img src={data.iconLink} alt={data.title} className="h-12 w-12" />
+              <Image
+                src={data.iconLink}
+                alt={data.title}
+                width={48}
+                height={48}
+                className="h-12 w-12"
+              />
             </div>
           )}
           {isSelecting && (

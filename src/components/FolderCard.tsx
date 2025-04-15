@@ -1,7 +1,6 @@
 "use client";
 import type { Folder, File } from "@prisma/client";
 import { EllipsisVertical, Loader2, Star, Trash } from "lucide-react";
-import Link from "next/link";
 import { cn } from "~/lib/utils";
 import { deleteFolder, toggleFolderFavorite, editFolder } from "~/server/actions/folder_action";
 import EditFolderForm from "./forms/EditFolderForm";
@@ -13,7 +12,6 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { useRole } from "~/hooks/use-role";
 import { Role } from "@prisma/client";
-import { FolderIcon, MoreVertical, Trash2 } from "lucide-react";
 
 import {
   DropdownMenu,
@@ -33,8 +31,6 @@ type Props = {
 
 export default function FolderCard({ data, onSelect, isSelected, isSelecting }: Props) {
   const [isHovered, setIsHovered] = useState(false);
-  const [isMenuOpen, setIsMenuOpen] = useState(false);
-  const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const { toast } = useToast();
   const [isPending, startTransition] = useTransition();
   const queryClient = useQueryClient();
@@ -46,12 +42,17 @@ export default function FolderCard({ data, onSelect, isSelected, isSelecting }: 
   const handleDelete = async () => {
     try {
       await deleteFolder(data.id);
-      toast({ title: "Folder deleted successfully" });
-      await queryClient.invalidateQueries({ queryKey: ["folders"] });
-      router.refresh();
-    } catch (error) {
       toast({
-        title: "Error deleting folder",
+        title: "Success",
+        description: "Folder deleted successfully",
+      });
+      await queryClient.invalidateQueries({ queryKey: ["folders"] });
+      await queryClient.invalidateQueries({ queryKey: ["files"] });
+    } catch (error) {
+      console.error("Failed to delete folder:", error);
+      toast({
+        title: "Error",
+        description: "Failed to delete folder",
         variant: "destructive",
       });
     }

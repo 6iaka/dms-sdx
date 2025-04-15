@@ -34,8 +34,12 @@ export default function UsersPage() {
     }
   }
 
-  async function handleRoleChange(userId: string, role: Role) {
+  async function handleRoleChange(userId: string, newRole: string) {
     try {
+      const role = Role[newRole as keyof typeof Role];
+      if (!role) {
+        throw new Error("Invalid role");
+      }
       await updateUserRole(userId, role);
       toast.success("User role updated successfully");
       void loadUsers();
@@ -80,15 +84,15 @@ export default function UsersPage() {
                 <td className="px-6 py-4 whitespace-nowrap">
                   <Select
                     value={user.role}
-                    onValueChange={(value) => handleRoleChange(user.id, Role[value as keyof typeof Role])}
+                    onValueChange={(value) => handleRoleChange(user.id, value)}
                   >
                     <SelectTrigger className="w-[180px] bg-gray-700 text-white">
                       <SelectValue placeholder="Select role" />
                     </SelectTrigger>
                     <SelectContent className="bg-gray-800 text-white">
-                      <SelectItem value={Role.VIEWER}>Viewer</SelectItem>
-                      <SelectItem value={Role.EDITOR}>Editor</SelectItem>
-                      <SelectItem value={Role.ADMINISTRATOR}>Administrator</SelectItem>
+                      <SelectItem value="VIEWER">Viewer</SelectItem>
+                      <SelectItem value="EDITOR">Editor</SelectItem>
+                      <SelectItem value="ADMINISTRATOR">Administrator</SelectItem>
                     </SelectContent>
                   </Select>
                 </td>
