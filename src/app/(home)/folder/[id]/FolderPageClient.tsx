@@ -48,10 +48,11 @@ const FolderPageClient = ({ data }: { data: FolderWithChildren }) => {
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [showTagDialog, setShowTagDialog] = useState(false);
   const [selectedTags, setSelectedTags] = useState<string[]>([]);
-  const [existingTags, setExistingTags] = useState<string[]>([]);
+  const [existingTags, setExistingTags] = useState<Tag[]>([]);
   const [showMoveDialog, setShowMoveDialog] = useState(false);
   const [targetFolderId, setTargetFolderId] = useState<number | null>(null);
   const [rootFolder, setRootFolder] = useState<Folder | null>(null);
+  const [loading, setLoading] = useState(true);
 
   const { data: tags } = useQuery({
     queryKey: ["tags"],
@@ -70,6 +71,28 @@ const FolderPageClient = ({ data }: { data: FolderWithChildren }) => {
     };
     fetchRootFolder();
   }, []);
+
+  useEffect(() => {
+    void loadData();
+  }, [data.id]);
+
+  async function loadData() {
+    try {
+      const [folderData, tagsData] = await Promise.all([
+        findFolderById(data.id),
+        getAllTags(),
+      ]);
+      if (folderData) {
+        setFolder(folderData);
+        setFiles(folderData.files);
+      }
+      setExistingTags(tagsData);
+    } catch (error) {
+      console.error("Error loading data:", error);
+    } finally {
+      setLoading(false);
+    }
+  }
 
   const handleSelect = (id: number, selected: boolean, isFolder: boolean) => {
     if (isFolder) {
@@ -148,7 +171,6 @@ const FolderPageClient = ({ data }: { data: FolderWithChildren }) => {
       });
       setShowTagDialog(false);
       setSelectedTags([]);
-      setExistingTags([]);
       setSelectedFiles(new Set());
       setIsSelecting(false);
       await queryClient.invalidateQueries({ queryKey: ["files"] });
@@ -210,9 +232,9 @@ const FolderPageClient = ({ data }: { data: FolderWithChildren }) => {
             file.tags.forEach(tag => tags.add(tag.name));
           }
         });
-      setExistingTags(Array.from(tags));
+      setSelectedTags(Array.from(tags));
     } else {
-      setExistingTags([]);
+      setSelectedTags([]);
     }
   }, [selectedFiles, data.files]);
 

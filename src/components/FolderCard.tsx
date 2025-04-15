@@ -1,5 +1,5 @@
 "use client";
-import type { Folder } from "@prisma/client";
+import type { Folder, File } from "@prisma/client";
 import { EllipsisVertical, Loader2, Star, Trash } from "lucide-react";
 import Link from "next/link";
 import { cn } from "~/lib/utils";
@@ -11,6 +11,8 @@ import { useQueryClient } from "@tanstack/react-query";
 import { useTransition } from "react";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { useRole } from "~/hooks/use-role";
+import { Role } from "@prisma/client";
 
 import {
   DropdownMenu,
@@ -20,18 +22,23 @@ import {
 } from "./ui/dropdown-menu";
 
 type Props = {
-  data: Folder;
-  isSelecting?: boolean;
+  data: Folder & {
+    files: File[];
+  };
+  onSelect?: (id: number, selected: boolean) => void;
   isSelected?: boolean;
-  onSelect?: (selected: boolean) => void;
+  isSelecting?: boolean;
 };
 
-const FolderCard = ({ data, isSelecting = false, isSelected = false, onSelect }: Props) => {
+const FolderCard = ({ data, onSelect, isSelected, isSelecting }: Props) => {
   const [isHovered, setIsHovered] = useState(false);
   const { toast } = useToast();
   const [isPending, startTransition] = useTransition();
   const queryClient = useQueryClient();
   const router = useRouter();
+  const { role } = useRole();
+  const canEdit = role === Role.ADMINISTRATOR || role === Role.EDITOR;
+  const canDelete = role === Role.ADMINISTRATOR || role === Role.EDITOR;
 
   const handleDelete = async () => {
     try {
@@ -94,9 +101,9 @@ const FolderCard = ({ data, isSelecting = false, isSelected = false, onSelect }:
   };
 
   const handleClick = (e: React.MouseEvent) => {
-    if (isSelecting) {
-      e.preventDefault();
-      onSelect?.(!isSelected);
+    if (isSelecting && onSelect) {
+      e.stopPropagation();
+      onSelect(data.id, !isSelected);
     } else {
       router.push(`/folder/${data.id}`);
     }
@@ -104,11 +111,12 @@ const FolderCard = ({ data, isSelecting = false, isSelected = false, onSelect }:
 
   return (
     <div
-      onClick={handleClick}
       className={cn(
-        "group relative flex cursor-pointer items-center gap-2.5 rounded-lg bg-card p-2 transition-all hover:bg-secondary/25",
-        isPending && "pointer-events-none opacity-20",
+        "group relative flex flex-col gap-2 rounded-lg bg-card p-2 transition-all hover:bg-secondary/25",
+        isSelecting && "cursor-pointer",
+        isSelected && "bg-primary/10 hover:bg-primary/20"
       )}
+      onClick={handleClick}
     >
       {isSelecting && (
         <div 
@@ -120,7 +128,7 @@ const FolderCard = ({ data, isSelecting = false, isSelected = false, onSelect }:
             checked={isSelected}
             onChange={(e) => {
               e.stopPropagation();
-              onSelect?.(e.target.checked);
+              onSelect?.(data.id, e.target.checked);
             }}
             className="h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary"
           />

@@ -1,7 +1,8 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { getUsers, updateUserRole, UserWithRole } from "~/server/actions/user_action";
+import type { UserWithRole } from "~/server/actions/user_action";
+import { getUsers, updateUserRole } from "~/server/actions/user_action";
 import { Role } from "@prisma/client";
 import { Button } from "~/components/ui/button";
 import {
@@ -18,7 +19,7 @@ export default function UsersPage() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    loadUsers();
+    void loadUsers();
   }, []);
 
   async function loadUsers() {
@@ -26,6 +27,7 @@ export default function UsersPage() {
       const data = await getUsers();
       setUsers(data);
     } catch (error) {
+      console.error("Failed to load users:", error);
       toast.error("Failed to load users");
     } finally {
       setLoading(false);
@@ -36,8 +38,9 @@ export default function UsersPage() {
     try {
       await updateUserRole(userId, role);
       toast.success("User role updated successfully");
-      loadUsers();
+      void loadUsers();
     } catch (error) {
+      console.error("Failed to update user role:", error);
       toast.error("Failed to update user role");
     }
   }
