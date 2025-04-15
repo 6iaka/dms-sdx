@@ -5,81 +5,70 @@ import { prisma } from "~/server/db";
 import { clerkClient } from "@clerk/nextjs/server";
 import type { User } from "@clerk/nextjs/server";
 import { Role } from "@prisma/client";
+import type { UserRole } from "@prisma/client";
 
 export type UserWithRole = {
   id: string;
-  username: string | null;
   email: string;
   role: Role;
-  isActive: boolean;
-  lastActiveAt: Date | null;
 };
 
 export async function getUsers(): Promise<UserWithRole[]> {
-  const session = await auth();
-  if (!session.userId) throw new Error("Unauthorized");
+  try {
+    const users = await prisma.userRole.findMany({
+      select: {
+        userId: true,
+        role: true,
+      },
+    });
 
-  // Get all users from Clerk
-  const clerk = await clerkClient();
-  const response = await clerk.users.getUserList();
-  const clerkUsers = response.data;
-  
-  // Get user roles from our database
-  const userRoles = await prisma.userRole.findMany();
-  
-  // Combine the data
-  return clerkUsers.map((clerkUser: User) => {
-    const userRole = userRoles.find((role) => role.userId === clerkUser.id);
-    
-    return {
-      id: clerkUser.id,
-      username: clerkUser.username,
-      email: clerkUser.emailAddresses[0]?.emailAddress ?? "",
-      role: userRole?.role ?? Role.VIEWER,
-      isActive: clerkUser.lastActiveAt ? new Date(clerkUser.lastActiveAt).getTime() > Date.now() - 5 * 60 * 1000 : false,
-      lastActiveAt: clerkUser.lastActiveAt ? new Date(clerkUser.lastActiveAt) : null,
-    };
-  });
+    return users.map((user) => ({
+      id: user.userId,
+      email: user.userId, // Using userId as email since we don't have email in UserRole
+      role: user.role,
+    }));
+  } catch (error) {
+    console.error("Error fetching users:", error);
+    return [];
+  }
 }
 
-export async function updateUserRole(userId: string, role: Role) {
-  const session = await auth();
-  if (!session.userId) throw new Error("Unauthorized");
-
-  // Skip admin check in development
-  if (process.env.NODE_ENV === "development") {
+export async function updateUserRole(userId: string, role: Role): Promise<boolean> {
+  try {
     await prisma.userRole.upsert({
       where: { userId },
       update: { role },
       create: { userId, role },
     });
-    return;
+    return true;
+  } catch (error) {
+    console.error("Error updating user role:", error);
+    return false;
   }
-
-  // Ensure the current user is an administrator in production
-  const currentUserRole = await prisma.userRole.findUnique({
-    where: { userId: session.userId },
-  });
-  
-  if (currentUserRole?.role !== Role.ADMINISTRATOR) {
-    throw new Error("Only administrators can update user roles");
-  }
-
-  await prisma.userRole.upsert({
-    where: { userId },
-    update: { role },
-    create: { userId, role },
-  });
 }
 
 export async function getUserRole(userId: string): Promise<Role | null> {
   try {
     const userRole = await prisma.userRole.findUnique({
       where: { userId },
+      select: { role: true },
     });
     return userRole?.role ?? null;
   } catch (error) {
     console.error("Error fetching user role:", error);
     return null;
+  }
+}
+
+export async function isAdmin(userId: string): Promise<boolean> {
+  try {
+    const userRole = await prisma.userRole.findUnique({
+      where: { userId },
+      select: { role: true },
+    });
+    return userRole?.role === Role.ADMINISTRATOR;
+  } catch (error) {
+    console.error("Error checking admin status:", error);
+    return false;
   }
 } 
