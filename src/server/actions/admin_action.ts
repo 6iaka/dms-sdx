@@ -19,7 +19,10 @@ export const syncDrive = async () => {
     
     // Get all items from Google Drive
     const items = await driveService.getAllItems();
-    if (!items) throw new Error("Failed to retrieve google drive files");
+    if (!items) {
+      console.log("No items found in Google Drive");
+      return { success: true, message: "Drive is already up to date" };
+    }
 
     // First sync all folders to ensure they exist
     const folderItems = items.filter(
@@ -194,8 +197,12 @@ export const syncDrive = async () => {
 
     revalidatePath("/");
     revalidatePath("/folder/:id", "page");
+    return { success: true, message: "Drive synced successfully" };
   } catch (error) {
     console.error("Error in syncDrive:", error);
-    throw error;
+    return { 
+      success: false, 
+      message: error instanceof Error ? error.message : "Failed to sync drive" 
+    };
   }
 };
