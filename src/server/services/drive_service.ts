@@ -25,16 +25,24 @@ export class DriveService {
    */
   getAllItems = async () => {
     try {
+      console.log("Starting Google Drive authentication...");
       const authClient = await this.auth.getClient();
       if (!authClient) {
+        console.error("Authentication failed: No auth client returned");
         throw new Error("Failed to authenticate with Google Drive");
       }
+      console.log("Authentication successful");
 
       const rootId = (await this.getRootFolder()).id;
-      if (!rootId) throw new Error("Failed to retrieve root folder");
+      if (!rootId) {
+        console.error("Failed to retrieve root folder");
+        throw new Error("Failed to retrieve root folder");
+      }
+      console.log("Root folder retrieved successfully");
 
       const allFiles: drive_v3.Schema$File[] = [];
       await this.fetchFiles(rootId, allFiles);
+      console.log(`Successfully fetched ${allFiles.length} files`);
 
       return allFiles;
     } catch (error) {
@@ -43,6 +51,12 @@ export class DriveService {
         console.error("Error details:", {
           message: error.message,
           stack: error.stack,
+          env: {
+            hasClientEmail: !!env.GOOGLE_CLIENT_EMAIL,
+            hasPrivateKey: !!env.GOOGLE_PRIVATE_KEY,
+            hasProjectId: !!env.GOOGLE_PROJECT_ID,
+            hasPrivateKeyId: !!env.GOOGLE_PRIVATE_KEY_ID,
+          }
         });
       }
       throw new Error("Failed to fetch files from Google Drive");
