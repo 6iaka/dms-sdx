@@ -9,7 +9,7 @@ export class DriveService {
       type: "service_account",
       project_id: env.GOOGLE_PROJECT_ID,
       private_key_id: env.GOOGLE_PRIVATE_KEY_ID,
-      private_key: env.GOOGLE_PRIVATE_KEY,
+      private_key: env.GOOGLE_PRIVATE_KEY?.replace(/\\n/g, '\n'),
       client_email: env.GOOGLE_CLIENT_EMAIL,
       client_id: env.GOOGLE_CLIENT_ID,
       universe_domain: "googleapis.com",
@@ -25,6 +25,11 @@ export class DriveService {
    */
   getAllItems = async () => {
     try {
+      const authClient = await this.auth.getClient();
+      if (!authClient) {
+        throw new Error("Failed to authenticate with Google Drive");
+      }
+
       const rootId = (await this.getRootFolder()).id;
       if (!rootId) throw new Error("Failed to retrieve root folder");
 
@@ -33,8 +38,14 @@ export class DriveService {
 
       return allFiles;
     } catch (error) {
-      console.error(error);
-      throw new Error((error as Error).message);
+      console.error("Error in getAllItems:", error);
+      if (error instanceof Error) {
+        console.error("Error details:", {
+          message: error.message,
+          stack: error.stack,
+        });
+      }
+      throw new Error("Failed to fetch files from Google Drive");
     }
   };
 
