@@ -58,7 +58,11 @@ const EditFileForm = ({ data }: Props) => {
 
   const { data: tags } = useQuery({
     queryKey: ["tags"],
-    queryFn: async () => await getAllTags(),
+    queryFn: async () => {
+      const allTags = await getAllTags();
+      // Filter out any tags with empty names
+      return allTags.filter(tag => tag.name && tag.name.trim() !== "");
+    },
   });
 
   const form = useForm<z.infer<typeof formSchema>>({
@@ -100,8 +104,9 @@ const EditFileForm = ({ data }: Props) => {
   };
 
   const handleAddTag = (tagName: string) => {
-    if (!selectedTags.includes(tagName)) {
-      const newTags = [...selectedTags, tagName];
+    const trimmedTagName = tagName.trim();
+    if (trimmedTagName && !selectedTags.includes(trimmedTagName)) {
+      const newTags = [...selectedTags, trimmedTagName];
       setSelectedTags(newTags);
       form.setValue("tagNames", newTags);
     }
@@ -156,15 +161,19 @@ const EditFileForm = ({ data }: Props) => {
                         <SelectValue placeholder={selectedTags.length > 0 ? "Add another tag" : "Add a tag"} />
                       </SelectTrigger>
                       <SelectContent>
-                        {tags?.map((tag) => (
-                          <SelectItem 
-                            key={tag.id} 
-                            value={tag.name}
-                            disabled={selectedTags.includes(tag.name)}
-                          >
-                            {tag.name} {selectedTags.includes(tag.name) && '(already added)'}
-                          </SelectItem>
-                        ))}
+                        {tags?.map((tag) => {
+                          const tagName = tag.name.trim();
+                          if (!tagName) return null;
+                          return (
+                            <SelectItem 
+                              key={tag.id} 
+                              value={tagName}
+                              disabled={selectedTags.includes(tagName)}
+                            >
+                              {tagName} {selectedTags.includes(tagName) && '(already added)'}
+                            </SelectItem>
+                          );
+                        })}
                       </SelectContent>
                     </Select>
                     

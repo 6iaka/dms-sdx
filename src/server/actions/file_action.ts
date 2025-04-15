@@ -193,7 +193,10 @@ export const updateFile = async (
   const user = await currentUser();
 
   try {
-    if (!user) throw new Error("Not authorized");
+    if (!user) {
+      console.error("Update failed: User not authenticated");
+      throw new Error("Not authorized");
+    }
 
     // Update file with all changes at once
     const updated = await fileService.update(id, {
@@ -208,15 +211,25 @@ export const updateFile = async (
       },
     });
 
+    if (!updated) {
+      console.error("Update failed: No file returned from service");
+      throw new Error("Failed to update file");
+    }
+
     revalidatePath("/");
     revalidatePath("/folder/:id", "page");
     revalidatePath("/tags", "page");
 
     return updated;
   } catch (error) {
-    console.error("Error updating file:", error);
+    console.error("Error updating file:", {
+      error,
+      fileId: id,
+      updateData: data,
+      userId: user?.id
+    });
     throw new Error(
-      error instanceof Error ? error.message : "Failed to update file",
+      error instanceof Error ? error.message : "Failed to update file"
     );
   }
 };

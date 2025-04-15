@@ -162,7 +162,8 @@ const FolderPageClient = ({ data }: { data: FolderWithChildren }) => {
       setIsSelecting(false);
       await queryClient.invalidateQueries({ queryKey: ["files"] });
       await queryClient.invalidateQueries({ queryKey: ["tags"] });
-    } catch {
+    } catch (error) {
+      console.error("Error assigning tags:", error);
       toast({
         title: "Error",
         description: "Failed to assign tags",
@@ -362,25 +363,30 @@ const FolderPageClient = ({ data }: { data: FolderWithChildren }) => {
           </DialogHeader>
           <div className="flex flex-col gap-4">
             <Select
-              value={selectedTags[selectedTags.length - 1]}
+              value=""
               onValueChange={(value) => {
-                if (!selectedTags.includes(value)) {
+                if (value && value.trim() !== "" && !selectedTags.includes(value)) {
                   setSelectedTags([...selectedTags, value]);
                 }
               }}
             >
               <SelectTrigger>
-                <SelectValue placeholder={selectedTags.length > 0 ? "Add another tag" : "Add a tag"} />
+                <SelectValue placeholder="Add a tag" />
               </SelectTrigger>
               <SelectContent>
-                {tags?.map((tag) => (
-                  <SelectItem 
-                    key={tag.id} 
-                    value={tag.name}
-                  >
-                    {tag.name}
-                  </SelectItem>
-                ))}
+                {tags?.map((tag) => {
+                  const tagName = tag.name.trim();
+                  if (!tagName) return null;
+                  return (
+                    <SelectItem 
+                      key={tag.id} 
+                      value={tagName}
+                      disabled={selectedTags.includes(tagName)}
+                    >
+                      {tagName} {selectedTags.includes(tagName) && '(already added)'}
+                    </SelectItem>
+                  );
+                })}
               </SelectContent>
             </Select>
 
