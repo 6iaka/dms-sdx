@@ -188,6 +188,36 @@ export class FolderService {
       throw new Error((error as Error).message);
     }
   };
+
+  /**
+   * Search folders by title
+   * @param query Search query
+   * @returns Array of matching folders
+   */
+  search = async (query: string) => {
+    try {
+      const folders = await prisma.folder.findMany({
+        where: {
+          title: {
+            contains: query,
+            mode: "insensitive",
+          },
+        },
+        include: {
+          files: {
+            include: {
+              tags: true,
+            },
+          },
+          children: true,
+        },
+        orderBy: { createdAt: "desc" },
+      });
+      return folders;
+    } catch (error) {
+      throw new Error((error as Error).message);
+    }
+  };
 }
 
 const folderService = new FolderService();
