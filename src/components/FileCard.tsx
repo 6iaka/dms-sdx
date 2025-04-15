@@ -49,35 +49,18 @@ const FileCard = ({ data, isSelecting, isSelected, onSelect }: Props) => {
   const handleDelete = async () => {
     try {
       await deleteFile(data.id);
-      toast({
-        title: "Success",
-        description: "File deleted successfully",
-      });
+      toast.success("File deleted successfully");
     } catch (error) {
       console.error("Error deleting file:", error);
       const errorMessage =
         error instanceof Error ? error.message : "Failed to delete file";
 
-      // Handle specific error cases
       if (errorMessage.includes("File not found")) {
-        toast({
-          title: "Error",
-          description:
-            "The file could not be found. It may have been already deleted.",
-          variant: "destructive",
-        });
+        toast.error("The file could not be found. It may have been already deleted.");
       } else if (errorMessage.includes("permissions")) {
-        toast({
-          title: "Error",
-          description: "You don't have permission to delete this file.",
-          variant: "destructive",
-        });
+        toast.error("You don't have permission to delete this file.");
       } else {
-        toast({
-          title: "Error",
-          description: errorMessage,
-          variant: "destructive",
-        });
+        toast.error(errorMessage);
       }
     }
   };
