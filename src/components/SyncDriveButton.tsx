@@ -5,7 +5,7 @@ import { syncDrive } from "~/server/actions/admin_action";
 import { useToast } from "~/hooks/use-toast";
 import { useState } from "react";
 
-export function SyncDriveButton() {
+export default function SyncDriveButton() {
   const [isSyncing, setIsSyncing] = useState(false);
   const { toast } = useToast();
 
