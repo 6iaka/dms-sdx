@@ -139,6 +139,28 @@ export default function FolderCard({ data, onSelect, isSelected, isSelecting }: 
               onClick={(e) => e.stopPropagation()}
             >
               {canEdit && <EditFolderForm id={data.id} />}
+              <DropdownMenuItem
+                onSelect={() => startTransition(async () => {
+                  const result = await toggleFolderFavorite(data.id);
+                  if (result.success) {
+                    toast({
+                      title: "Success",
+                      description: result.message,
+                    });
+                    await queryClient.invalidateQueries({ queryKey: ["folders"] });
+                  } else {
+                    toast({
+                      title: "Error",
+                      description: result.message,
+                      variant: "destructive",
+                    });
+                  }
+                })}
+                className="flex items-center gap-2"
+              >
+                <Star className="h-4 w-4" />
+                <span className="flex-1">{data.isFavorite ? "Remove from favorites" : "Add to favorites"}</span>
+              </DropdownMenuItem>
               {canDelete && (
                 <DropdownMenuItem
                   onSelect={() => startTransition(handleDelete)}
