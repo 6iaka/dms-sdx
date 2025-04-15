@@ -24,10 +24,14 @@ export const syncDrive = async () => {
       return { success: true, message: "Drive is already up to date" };
     }
 
+    console.log(`Found ${items.length} items to sync`);
+
     // First sync all folders to ensure they exist
     const folderItems = items.filter(
       (item) => item.mimeType === "application/vnd.google-apps.folder"
     );
+    
+    console.log(`Found ${folderItems.length} folders to sync`);
     
     // Create a map to track folder relationships
     const folderMap = new Map<string, string>();
@@ -77,7 +81,8 @@ export const syncDrive = async () => {
         });
         syncedFolders.add(folderId);
       } catch (error) {
-        console.error("Error syncing folder:", error);
+        console.error(`Error syncing folder ${folder.name}:`, error);
+        throw error;
       }
     };
 
@@ -88,10 +93,14 @@ export const syncDrive = async () => {
       )
     );
 
+    console.log(`Synced ${syncedFolders.size} folders`);
+
     // Then sync all files
     const fileItems = items.filter(
       (item) => item.mimeType !== "application/vnd.google-apps.folder"
     );
+
+    console.log(`Found ${fileItems.length} files to sync`);
 
     // Get all existing files to avoid unnecessary updates
     const existingFiles = await fileService.findMany();
@@ -104,6 +113,8 @@ export const syncDrive = async () => {
 
     for (let i = 0; i < fileItems.length; i += batchSize) {
       const batch = fileItems.slice(i, i + batchSize);
+      console.log(`Processing batch ${i/batchSize + 1} of ${Math.ceil(fileItems.length/batchSize)}`);
+      
       const results = await Promise.allSettled(
         batch.map((item) =>
           limit(async () => {
@@ -193,8 +204,9 @@ export const syncDrive = async () => {
                 syncedCount++;
               }
             } catch (error) {
-              console.error("Error syncing file:", error);
+              console.error(`Error syncing file ${item.name}:`, error);
               errorCount++;
+              throw error;
             }
           })
         )
@@ -212,6 +224,7 @@ export const syncDrive = async () => {
       }
     }
 
+    console.log(`Sync completed: ${syncedCount} files synced, ${errorCount} errors`);
     revalidatePath("/");
     revalidatePath("/folder/:id", "page");
     return { 
