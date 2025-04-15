@@ -93,8 +93,7 @@ const FileCard = ({ data, isSelecting, isSelected, onSelect }: Props) => {
       onMouseEnter={() => setIsHovered(true)}
       onMouseLeave={() => setIsHovered(false)}
     >
-      <a
-        href={data.webViewLink}
+      <div
         onClick={handleClick}
         className={cn(
           "group relative flex flex-col gap-2 rounded-lg bg-card p-2 transition-all hover:bg-secondary/25",
@@ -102,7 +101,6 @@ const FileCard = ({ data, isSelecting, isSelected, onSelect }: Props) => {
           isSelecting && "cursor-pointer",
           isSelected && "bg-primary/10 hover:bg-primary/20",
         )}
-        onDoubleClick={() => (window.location.href = data.webViewLink)}
       >
         <div className="relative aspect-square w-full overflow-hidden rounded-lg bg-muted">
           {data.mimeType?.startsWith("image/") ? (
@@ -142,87 +140,39 @@ const FileCard = ({ data, isSelecting, isSelected, onSelect }: Props) => {
         </div>
 
         {(canEdit || canDelete) && (
-    <a
-      href={data.webViewLink}
-      onClick={handleClick}
-      className={cn(
-        "group relative flex flex-col gap-2 rounded-lg bg-card p-2 transition-all hover:bg-secondary/25",
-        isPending && "pointer-events-none opacity-20",
-        isSelecting && "cursor-pointer",
-        isSelected && "bg-primary/10 hover:bg-primary/20",
-      )}
-      onDoubleClick={() => (window.location.href = data.webViewLink)}
-    >
-      <div className="relative aspect-square w-full overflow-hidden rounded-lg bg-muted">
-        {data.mimeType?.startsWith("image/") ? (
-          <Image
-            src={data.thumbnailLink || data.webContentLink}
-            alt={data.title}
-            width={500}
-            height={500}
-            className="h-full w-full object-cover"
-            onError={(e) => {
-              const target = e.target as HTMLImageElement;
-              target.style.display = "none";
-            }}
-          />
-        ) : (
-          <div className="flex h-full w-full items-center justify-center">
-            <img src={data.iconLink} alt={data.title} className="h-12 w-12" />
-          </div>
-        )}
-        {isSelecting && (
-          <div className="absolute inset-0 flex items-center justify-center bg-black/50">
-            <div
-              className={cn(
-                "size-6 rounded-full border-2",
-                isSelected ? "border-primary bg-primary" : "border-white",
-              )}
-            />
-          </div>
-        )}
-      </div>
-
-      <div className="flex flex-col gap-1">
-        <h3 className="line-clamp-2 text-sm font-medium">{data.title}</h3>
-        <p className="text-xs text-muted-foreground">
-          {formatFileSize(data.fileSize)}
-        </p>
-      </div>
-
-      {(canEdit || canDelete) && (
-        <div className="absolute right-2 top-2 opacity-0 transition-opacity group-hover:opacity-100">
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button
-                variant="ghost"
-                size="icon"
-                className="h-8 w-8 rounded-full"
-              >
-                <EllipsisVertical className="h-4 w-4" />
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end">
-              {canEdit && (
-                <DropdownMenuItem asChild>
-                  <EditFileForm data={data} />
-                </DropdownMenuItem>
-              )}
-              {canDelete && (
-                <DropdownMenuItem
-                  className="text-destructive"
-                  onClick={handleDelete}
+          <div className="absolute right-2 top-2 opacity-0 transition-opacity group-hover:opacity-100">
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-8 w-8 rounded-full"
                 >
-                  <Trash className="mr-2 h-4 w-4" />
-                  Delete
-                </DropdownMenuItem>
-              )}
-            </DropdownMenuContent>
-          </DropdownMenu>
-        </div>
-      )}
-    </a>
+                  <EllipsisVertical className="h-4 w-4" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                {canEdit && (
+                  <DropdownMenuItem asChild>
+                    <EditFileForm data={data} />
+                  </DropdownMenuItem>
+                )}
+                {canDelete && (
+                  <DropdownMenuItem
+                    className="text-destructive"
+                    onClick={handleDelete}
+                  >
+                    <Trash className="mr-2 h-4 w-4" />
+                    Delete
+                  </DropdownMenuItem>
+                )}
+              </DropdownMenuContent>
+            </DropdownMenu>
+          </div>
+        )}
+      </div>
+    </div>
   );
 };
 
-export default FileCard;
+export { FileCard };
