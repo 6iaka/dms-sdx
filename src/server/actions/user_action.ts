@@ -70,4 +70,16 @@ export async function updateUserRole(userId: string, role: Role) {
     update: { role },
     create: { userId, role },
   });
+}
+
+export async function getUserRole(userId: string): Promise<Role | null> {
+  try {
+    const userRole = await prisma.userRole.findUnique({
+      where: { userId },
+    });
+    return userRole?.role ?? null;
+  } catch (error) {
+    console.error("Error fetching user role:", error);
+    return null;
+  }
 } 
