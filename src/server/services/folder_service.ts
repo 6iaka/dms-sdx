@@ -219,6 +219,27 @@ export class FolderService {
       throw new Error((error as Error).message);
     }
   };
+
+  toggleFavorite = async (id: number) => {
+    try {
+      const folder = await prisma.folder.findUnique({
+        where: { id },
+      });
+      if (!folder) throw new Error("Folder not found");
+
+      const updated = await prisma.folder.update({
+        where: { id },
+        data: { isFavorite: !folder.isFavorite },
+        include: {
+          files: true,
+          children: true,
+        },
+      });
+      return updated;
+    } catch (error) {
+      throw new Error((error as Error).message);
+    }
+  };
 }
 
 const folderService = new FolderService();
