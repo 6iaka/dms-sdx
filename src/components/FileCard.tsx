@@ -19,6 +19,7 @@ import { useRole } from "~/hooks/use-role";
 import { Role } from "@prisma/client";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { FileIcon } from "lucide-react";
 
 type Props = {
   data: FileData & {
@@ -36,6 +37,9 @@ const FileCard = ({ data, isSelecting, isSelected, onSelect }: Props) => {
   const { role } = useRole();
   const router = useRouter();
   const [isHovered, setIsHovered] = useState(false);
+  const [isMenuOpen, setIsMenuOpen] = useState(false);
+  const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
+  const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
 
   const handleClick = (e: React.MouseEvent) => {
     if (isSelecting && onSelect) {
@@ -50,42 +54,19 @@ const FileCard = ({ data, isSelecting, isSelected, onSelect }: Props) => {
   const handleDelete = async () => {
     try {
       await deleteFile(data.id);
-      toast({
-        title: "Success",
-        description: "File deleted successfully",
-      });
+      toast({ title: "File deleted successfully" });
       await queryClient.invalidateQueries({ queryKey: ["files"] });
+      router.refresh();
     } catch (error) {
-      console.error("Error deleting file:", error);
-      const errorMessage =
-        error instanceof Error ? error.message : "Failed to delete file";
-
-      // Handle specific error cases
-      if (errorMessage.includes("File not found")) {
-        toast({
-          title: "Error",
-          description:
-            "The file could not be found. It may have been already deleted.",
-          variant: "destructive",
-        });
-      } else if (errorMessage.includes("permissions")) {
-        toast({
-          title: "Error",
-          description: "You don't have permission to delete this file.",
-          variant: "destructive",
-        });
-      } else {
-        toast({
-          title: "Error",
-          description: errorMessage,
-          variant: "destructive",
-        });
-      }
+      toast({
+        title: "Error deleting file",
+        variant: "destructive",
+      });
     }
   };
 
   const canEdit = role === Role.EDITOR || role === Role.ADMINISTRATOR;
-  const canDelete = role === Role.EDITOR || role === Role.ADMINISTRATOR;
+  const canDelete = role === Role.ADMINISTRATOR;
 
   return (
     <div
@@ -103,21 +84,17 @@ const FileCard = ({ data, isSelecting, isSelected, onSelect }: Props) => {
         )}
       >
         <div className="relative aspect-square w-full overflow-hidden rounded-lg bg-muted">
-          {data.mimeType?.startsWith("image/") ? (
+          {data.thumbnailUrl ? (
             <Image
-              src={data.thumbnailLink || data.webContentLink}
+              src={data.thumbnailUrl}
               alt={data.title}
-              width={500}
-              height={500}
+              width={200}
+              height={200}
               className="h-full w-full object-cover"
-              onError={(e) => {
-                const target = e.target as HTMLImageElement;
-                target.style.display = "none";
-              }}
             />
           ) : (
-            <div className="flex h-full w-full items-center justify-center">
-              <img src={data.iconLink} alt={data.title} className="h-12 w-12" />
+            <div className="flex h-full w-full items-center justify-center bg-muted">
+              <FileIcon className="h-12 w-12 text-muted-foreground" />
             </div>
           )}
           {isSelecting && (
