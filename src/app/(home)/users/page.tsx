@@ -19,7 +19,10 @@ export default function UsersPage() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    void loadUsers();
+    void loadUsers().catch((error) => {
+      console.error("Failed to load users:", error);
+      toast.error("Failed to load users");
+    });
   }, []);
 
   async function loadUsers() {
