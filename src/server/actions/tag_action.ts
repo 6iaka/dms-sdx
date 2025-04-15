@@ -25,9 +25,11 @@ export const getAllTags = async () => {
 
 export const deleteTag = async (name: string) => {
   try {
-    const tag = await tagService.delete(name);
+    const tag = await tagService.findByName(name);
+    if (!tag) throw new Error("Tag not found");
+    const deletedTag = await tagService.delete(tag.id);
     revalidatePath("/");
-    return tag;
+    return deletedTag;
   } catch (error) {
     console.error(error);
   }
