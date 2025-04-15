@@ -115,6 +115,29 @@ export const syncDrive = async () => {
                 return;
               }
 
+              // Check if parent folder exists in our database
+              const parentFolderInDb = await folderService.findByGoogleId(parentFolder);
+              if (!parentFolderInDb) {
+                // If parent folder doesn't exist, try to create it
+                const parentFolderInDrive = folderItems.find(f => f.id === parentFolder);
+                if (!parentFolderInDrive) {
+                  console.warn(`Parent folder ${parentFolder} not found in Google Drive`);
+                  return;
+                }
+
+                // Create the missing parent folder
+                await folderService.upsert({
+                  parent: parentFolderInDrive.parents?.[0] 
+                    ? { connect: { googleId: parentFolderInDrive.parents[0] } }
+                    : undefined,
+                  description: parentFolderInDrive.description,
+                  userClerkId: user.id,
+                  googleId: parentFolderInDrive.id!,
+                  title: parentFolderInDrive.name!,
+                  isRoot: !parentFolderInDrive.parents || parentFolderInDrive.parents.length === 0,
+                });
+              }
+
               // Check if file exists and hasn't changed
               const existingFile = existingFileMap.get(item.id!);
               if (existingFile && 
