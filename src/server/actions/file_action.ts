@@ -87,6 +87,7 @@ export const uploadFile = async (payload: UploadType) => {
     const category = getCategoryFromMimeType(mimeType);
     if (!category) throw new Error("Unrecognized File Type");
 
+    // Create file record without waiting for thumbnail
     const newFile = await fileService.upsert({
       ...(payload.tagNames && {
         tags: {
@@ -98,7 +99,7 @@ export const uploadFile = async (payload: UploadType) => {
       originalFilename: driveFile.originalFilename!,
       webContentLink: driveFile.webContentLink!,
       fileExtension: driveFile.fileExtension!,
-      thumbnailLink: driveFile.thumbnailLink,
+      thumbnailLink: null, // Initialize as null
       webViewLink: driveFile.webViewLink!,
       fileSize: Number(driveFile.size),
       description: payload.description,
@@ -109,6 +110,22 @@ export const uploadFile = async (payload: UploadType) => {
       categeory: category,
     });
 
+    // Update thumbnail asynchronously
+    if (mimeType.startsWith('video/') || mimeType.startsWith('image/')) {
+      setTimeout(async () => {
+        try {
+          const updatedDriveFile = await driveService.getFile(driveFileId);
+          if (updatedDriveFile.thumbnailLink) {
+            await fileService.update(newFile.id, {
+              thumbnailLink: updatedDriveFile.thumbnailLink,
+            });
+          }
+        } catch (error) {
+          console.error('Error updating thumbnail:', error);
+        }
+      }, 0);
+    }
+
     revalidatePath("/");
     revalidatePath("/folder/:id", "page");
 
@@ -116,6 +133,7 @@ export const uploadFile = async (payload: UploadType) => {
   } catch (error) {
     await driveService.deleteItem(driveFileId);
     console.error((error as Error).message);
+    throw error;
   }
 };
 

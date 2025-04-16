@@ -289,6 +289,24 @@ export class DriveService {
       throw new Error((error as Error).message);
     }
   };
+
+  /**
+   * Get a single file's details
+   * @param fileId ID of the file to get
+   * @returns File details
+   */
+  getFile = async (fileId: string) => {
+    try {
+      const response = await this.drive.files.get({
+        fileId,
+        fields: 'id, name, mimeType, thumbnailLink, webContentLink, webViewLink, iconLink, size, fileExtension, originalFilename',
+      });
+      return response.data;
+    } catch (error) {
+      console.error('Error getting file:', error);
+      throw new Error((error as Error).message);
+    }
+  };
 }
 
 const driveService = new DriveService();
