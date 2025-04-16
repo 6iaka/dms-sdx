@@ -112,7 +112,7 @@ export const uploadFile = async (payload: UploadType) => {
 
     // Update thumbnail asynchronously
     if (mimeType.startsWith('video/') || mimeType.startsWith('image/')) {
-      setTimeout(async () => {
+      void (async () => {
         try {
           const updatedDriveFile = await driveService.getFile(driveFileId);
           if (updatedDriveFile.thumbnailLink) {
@@ -123,7 +123,7 @@ export const uploadFile = async (payload: UploadType) => {
         } catch (error) {
           console.error('Error updating thumbnail:', error);
         }
-      }, 0);
+      })();
     }
 
     revalidatePath("/");
