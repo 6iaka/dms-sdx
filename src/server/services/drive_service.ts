@@ -70,22 +70,39 @@ export class DriveService {
    */
   fetchFiles = async (folderId: string, allFiles: drive_v3.Schema$File[]) => {
     try {
-      const response = await this.drive.files.list({
-        q: `'${folderId}' in parents and trashed=false`,
-        pageSize: 1000,
-        fields: "*",
-      });
+      let pageToken: string | undefined;
+      do {
+        const response = await this.drive.files.list({
+          q: `'${folderId}' in parents and trashed=false`,
+          pageSize: 1000,
+          fields: "nextPageToken, files(id, name, mimeType, parents, description, size, iconLink, originalFilename, webContentLink, fileExtension, thumbnailLink, webViewLink)",
+          pageToken,
+          supportsAllDrives: true,
+          includeItemsFromAllDrives: true,
+          corpora: "allDrives"
+        });
 
-      const files = response.data.files || [];
-      allFiles.push(...files);
+        const files = response.data.files || [];
+        console.log(`Fetched ${files.length} files from folder ${folderId}`);
+        allFiles.push(...files);
 
-      for (const file of files) {
-        if (file.mimeType === "application/vnd.google-apps.folder") {
-          await this.fetchFiles(file.id!, allFiles); // Recursively fetch subfolder contents
+        // Process folders first
+        const folders = files.filter(file => file.mimeType === "application/vnd.google-apps.folder");
+        console.log(`Found ${folders.length} folders to process`);
+        for (const folder of folders) {
+          if (folder.id) {
+            await this.fetchFiles(folder.id, allFiles);
+          }
         }
-      }
+
+        pageToken = response.data.nextPageToken ?? undefined;
+        if (pageToken) {
+          console.log("Fetching next page...");
+        }
+      } while (pageToken);
+
     } catch (error) {
-      console.error(error);
+      console.error(`Error fetching files from folder ${folderId}:`, error);
       throw new Error((error as Error).message);
     }
   };
@@ -234,30 +251,41 @@ export class DriveService {
    */
   moveItem = async (itemId: string, targetFolderId: string) => {
     try {
-      // First get the current parents of the item
+      // First get the current parents
       const file = await this.drive.files.get({
         fileId: itemId,
         fields: 'parents',
       });
 
-      // Remove the item from its current parent(s)
-      if (file.data.parents) {
-        await this.drive.files.update({
+      const previousParents = file.data.parents?.join(',') || '';
+
+      // Move the file to the new folder
+      const response = await this.drive.files.update({
+        fileId: itemId,
+        addParents: targetFolderId,
+        removeParents: previousParents,
+        fields: '*',
+      });
+
+      // For videos, ensure thumbnail is generated
+      if (response.data.mimeType?.startsWith('video/')) {
+        // Wait a bit for thumbnail generation
+        await new Promise(resolve => setTimeout(resolve, 2000));
+        
+        // Get the file again to check thumbnail
+        const updatedFile = await this.drive.files.get({
           fileId: itemId,
-          removeParents: file.data.parents.join(','),
-          addParents: targetFolderId,
+          fields: 'thumbnailLink',
         });
-      } else {
-        // If no parents, just add to the new folder
-        await this.drive.files.update({
-          fileId: itemId,
-          addParents: targetFolderId,
-        });
+
+        if (!updatedFile.data.thumbnailLink) {
+          console.warn('Thumbnail not yet generated for video:', itemId);
+        }
       }
 
-      return true;
+      return response.data;
     } catch (error) {
-      console.error(error);
+      console.error('Error moving item:', error);
       throw new Error((error as Error).message);
     }
   };
