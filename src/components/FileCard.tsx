@@ -1,5 +1,5 @@
 "use client";
-import { type File, type Tag } from "@prisma/client";
+import { type File as PrismaFile, type Tag } from "@prisma/client";
 import { useQuery } from "@tanstack/react-query";
 import { useState } from "react";
 import { toast } from "sonner";
@@ -21,9 +21,10 @@ import EditFileForm from "./forms/EditFileForm";
 import Image from "next/image";
 import { useRole } from "~/hooks/use-role";
 import { useRouter } from "next/navigation";
+import { FileText, File as FileIcon } from "lucide-react";
 
 type Props = {
-  data: File & {
+  data: PrismaFile & {
     tags: Tag[];
   };
   isSelecting?: boolean;
@@ -66,6 +67,81 @@ const FileCard = ({ data, isSelecting, isSelected, onSelect }: Props) => {
     }
   };
 
+  const renderThumbnail = () => {
+    if (data.mimeType?.startsWith('video/')) {
+      return (
+        <div className="relative w-full h-full">
+          <Image
+            src={data.thumbnailLink || data.webContentLink}
+            alt={data.title}
+            width={500}
+            height={500}
+            className="w-full h-full object-cover"
+            unoptimized
+          />
+          <div className="absolute inset-0 flex items-center justify-center">
+            <div className="rounded-full bg-white/90 p-3 shadow-lg z-10">
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                viewBox="0 0 24 24"
+                fill="currentColor"
+                className="h-8 w-8 text-black"
+              >
+                <path
+                  fillRule="evenodd"
+                  d="M4.5 5.653c0-1.426 1.529-2.33 2.779-1.643l11.54 6.348c1.295.712 1.295 2.573 0 3.285L7.28 19.991c-1.25.687-2.779-.217-2.779-1.643V5.653z"
+                  clipRule="evenodd"
+                />
+              </svg>
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    if (data.thumbnailLink) {
+      return (
+        <Image
+          src={data.thumbnailLink}
+          alt={data.title}
+          width={500}
+          height={500}
+          className="w-full h-full object-cover"
+          unoptimized
+        />
+      );
+    }
+
+    if (data.mimeType?.startsWith('image/')) {
+      return (
+        <Image
+          src={data.webContentLink}
+          alt={data.title}
+          width={500}
+          height={500}
+          className="w-full h-full object-cover"
+          unoptimized
+        />
+      );
+    }
+
+    // For PDFs, show a PDF icon with a background
+    if (data.mimeType === 'application/pdf') {
+      return (
+        <div className="w-full h-full flex items-center justify-center bg-gray-100 dark:bg-gray-800">
+          <FileText className="w-12 h-12 text-gray-500 dark:text-gray-400" />
+        </div>
+      );
+    }
+
+    // Default icon for other file types
+    return (
+      <div className="w-full h-full flex items-center justify-center bg-gray-100 dark:bg-gray-800">
+        <FileIcon className="w-12 h-12 text-gray-500 dark:text-gray-400" />
+      </div>
+    );
+  };
+
   return (
     <Card
       className={cn(
@@ -80,29 +156,7 @@ const FileCard = ({ data, isSelecting, isSelected, onSelect }: Props) => {
         onClick={handleClick}
       >
         <div className="relative aspect-square w-full overflow-hidden rounded-lg bg-muted">
-          {data.mimeType?.startsWith("image/") ? (
-            <Image
-              src={data.thumbnailLink || data.webContentLink}
-              alt={data.title}
-              width={500}
-              height={500}
-              className="h-full w-full object-cover"
-              onError={(e) => {
-                const target = e.target as HTMLImageElement;
-                target.style.display = "none";
-              }}
-            />
-          ) : (
-            <div className="flex h-full w-full items-center justify-center">
-              <Image
-                src={data.iconLink}
-                alt={data.title}
-                width={48}
-                height={48}
-                className="h-12 w-12"
-              />
-            </div>
-          )}
+          {renderThumbnail()}
           {isSelecting && (
             <div className="absolute inset-0 flex items-center justify-center bg-black/50">
               <div
