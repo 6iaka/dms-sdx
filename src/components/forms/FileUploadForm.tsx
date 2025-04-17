@@ -34,6 +34,16 @@ import { Textarea } from "~/components/ui/textarea";
 import { useToast } from "~/hooks/use-toast";
 import { getAllTags } from "~/server/actions/tag_action";
 
+interface UploadResponse {
+  success: boolean;
+  error?: string;
+  data?: {
+    id: number;
+    title: string;
+    // Add other file properties as needed
+  };
+}
+
 const formSchema = z.object({
   file: z.instanceof(File).nullable(),
   tagNames: z.array(z.string()).optional(),
@@ -86,6 +96,7 @@ const FileUploadForm = ({ folderId }: Props) => {
     try {
       setIsLoading(true);
       const formData = new FormData();
+      
       if (data.file) {
         formData.append("file", data.file);
       }
@@ -104,7 +115,7 @@ const FileUploadForm = ({ folderId }: Props) => {
         body: formData,
       });
 
-      const result = await response.json();
+      const result = await response.json() as UploadResponse;
       
       if (response.ok) {
         toast({
