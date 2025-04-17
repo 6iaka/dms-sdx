@@ -32,7 +32,6 @@ import {
 } from "~/components/ui/select";
 import { Textarea } from "~/components/ui/textarea";
 import { useToast } from "~/hooks/use-toast";
-import { uploadFile } from "~/server/actions/file_action";
 import { getAllTags } from "~/server/actions/tag_action";
 
 const formSchema = z.object({
@@ -100,8 +99,14 @@ const FileUploadForm = ({ folderId }: Props) => {
         formData.append("description", data.description);
       }
 
-      const result = await uploadFile(formData);
-      if (result.success) {
+      const response = await fetch('/api/upload', {
+        method: 'POST',
+        body: formData,
+      });
+
+      const result = await response.json();
+      
+      if (response.ok) {
         toast({
           title: "Success",
           description: "File uploaded successfully",
