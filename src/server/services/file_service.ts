@@ -206,13 +206,27 @@ export class FileService {
    */
   upsert = async (data: Prisma.FileCreateInput) => {
     try {
+      console.log("Attempting to upsert file with data:", {
+        googleId: data.googleId,
+        title: data.title,
+        userClerkId: data.userClerkId
+      });
+
       const file = await prisma.file.upsert({
         where: { googleId: data.googleId },
         create: data,
         update: data,
       });
+
+      console.log("File upsert successful:", {
+        id: file.id,
+        googleId: file.googleId,
+        title: file.title
+      });
+
       return file;
     } catch (error) {
+      console.error("Error in file upsert:", error);
       throw new Error((error as Error).message);
     }
   };

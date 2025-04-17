@@ -83,35 +83,52 @@ const FileUploadForm = ({ folderId }: Props) => {
     }
   };
 
-  const onSubmit = async (values: z.infer<typeof formSchema>) => {
-    if (!values.file) {
+  const onSubmit = async (data: z.infer<typeof formSchema>) => {
+    try {
+      setIsLoading(true);
+      const formData = new FormData();
+      if (data.file) {
+        formData.append("file", data.file);
+      }
+      if (folderId) {
+        formData.append("folderId", folderId.toString());
+      }
+      if (data.tagNames) {
+        formData.append("tagNames", JSON.stringify(data.tagNames));
+      }
+      if (data.description) {
+        formData.append("description", data.description);
+      }
+
+      const result = await uploadFile(formData);
+      if (result.success) {
+        toast({
+          title: "Success",
+          description: "File uploaded successfully",
+        });
+        // Revalidate the file list
+        queryClient.invalidateQueries({ queryKey: ["files", folderId] });
+        // Reset form
+        form.reset();
+        setSelectedTags([]);
+        // Close dialog
+        setIsOpen(false);
+      } else {
+        toast({
+          title: "Error",
+          description: result.error || "Failed to upload file",
+          variant: "destructive",
+        });
+      }
+    } catch (error) {
+      console.error("Upload error:", error);
       toast({
         title: "Error",
-        description: "Please select a file to upload",
+        description: "Failed to upload file",
         variant: "destructive",
       });
-      return;
-    }
-
-    const response = await uploadFile({
-      description: values.description,
-      tagNames: selectedTags,
-      file: values.file,
-      folderId,
-    });
-
-    if (!response) {
-      toast({
-        title: "Error",
-        variant: "destructive",
-      });
-    } else {
-      toast({ title: "Success" });
-      form.reset();
-      setSelectedTags([]);
-      setIsOpen(false);
-      await queryClient.invalidateQueries({ queryKey: ["files"] });
-      await queryClient.invalidateQueries({ queryKey: ["tags"] });
+    } finally {
+      setIsLoading(false);
     }
   };
 

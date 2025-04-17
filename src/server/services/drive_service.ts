@@ -126,7 +126,9 @@ export class DriveService {
 
       const arrayBuffer = await file.arrayBuffer();
       const buffer = Buffer.from(arrayBuffer);
-      const stream = Readable.from(buffer);
+
+      // For large files, use resumable upload
+      const uploadType = file.size > 5 * 1024 * 1024 ? "resumable" : "multipart";
 
       const response = await this.drive.files.create({
         requestBody: {
@@ -136,16 +138,21 @@ export class DriveService {
           name: file.name,
         },
         supportsAllDrives: true,
-        uploadType: "resumable",
+        uploadType,
         media: {
           mimeType: file.type,
-          body: stream,
+          body: Readable.from(buffer),
         },
-        fields: "*",
+        fields: "id, name, mimeType, webContentLink, webViewLink, iconLink, size, fileExtension, originalFilename",
       });
 
-      await this.drive.permissions.create({
-        fileId: response.data.id!,
+      if (!response.data.id) {
+        throw new Error("Failed to upload file to Google Drive");
+      }
+
+      // Set permissions asynchronously
+      void this.drive.permissions.create({
+        fileId: response.data.id,
         requestBody: {
           role: "reader",
           type: "anyone",
@@ -154,8 +161,8 @@ export class DriveService {
 
       return response.data;
     } catch (error) {
-      console.error(error);
-      throw new Error((error as Error).message);
+      console.error('Error uploading file:', error);
+      throw new Error(error instanceof Error ? error.message : "Failed to upload file");
     }
   };
 
@@ -301,10 +308,27 @@ export class DriveService {
         fileId,
         fields: 'id, name, mimeType, thumbnailLink, webContentLink, webViewLink, iconLink, size, fileExtension, originalFilename',
       });
+
+      // For videos, if no thumbnail is available, wait and try again
+      if (response.data.mimeType?.startsWith('video/') && !response.data.thumbnailLink) {
+        console.log("Waiting for video thumbnail generation...");
+        await new Promise(resolve => setTimeout(resolve, 2000));
+        
+        const retryResponse = await this.drive.files.get({
+          fileId,
+          fields: 'id, name, mimeType, thumbnailLink, webContentLink, webViewLink, iconLink, size, fileExtension, originalFilename',
+        });
+        
+        if (retryResponse.data.thumbnailLink) {
+          console.log("Video thumbnail generated successfully");
+          return retryResponse.data;
+        }
+      }
+
       return response.data;
     } catch (error) {
       console.error('Error getting file:', error);
-      throw new Error((error as Error).message);
+      throw new Error(error instanceof Error ? error.message : "Failed to get file");
     }
   };
 }

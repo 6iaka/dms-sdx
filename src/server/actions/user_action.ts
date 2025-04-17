@@ -15,6 +15,18 @@ export type UserWithRole = {
   lastActiveAt: Date | null;
 };
 
+// Track active users in memory
+const activeUsers = new Set<string>();
+
+export async function markUserActive(userId: string) {
+  activeUsers.add(userId);
+  // Remove user from active set after 5 minutes of inactivity
+  setTimeout(() => {
+    activeUsers.delete(userId);
+  }, 5 * 60 * 1000);
+  return Promise.resolve();
+}
+
 export async function getUsers(): Promise<UserWithRole[]> {
   const session = await auth();
   if (!session.userId) throw new Error("Unauthorized");
@@ -31,10 +43,8 @@ export async function getUsers(): Promise<UserWithRole[]> {
   return clerkUsers.map((clerkUser: User) => {
     const userRole = userRoles.find((role) => role.userId === clerkUser.id);
     
-    // Consider user active only if they are currently active
-    const isActive = clerkUser.lastActiveAt 
-      ? new Date(clerkUser.lastActiveAt).getTime() > Date.now() - 5 * 60 * 1000 
-      : false;
+    // Check if user is in the active set
+    const isActive = activeUsers.has(clerkUser.id);
     
     return {
       id: clerkUser.id,

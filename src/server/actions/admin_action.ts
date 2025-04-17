@@ -206,22 +206,15 @@ export const syncDrive = async () => {
             } catch (error) {
               console.error(`Error syncing file ${item.name}:`, error);
               errorCount++;
-              return null; // Return null to indicate failure but continue processing
+              return null;
             }
           })
         )
       );
 
-      // Check if we're approaching the timeout limit
-      if (i + batchSize < fileItems.length) {
-        // If we have more files to process, return a partial success
-        revalidatePath("/");
-        revalidatePath("/folder/:id", "page");
-        return { 
-          success: true, 
-          message: `Synced ${syncedCount} files (${errorCount} errors). More files to process...` 
-        };
-      }
+      // Revalidate paths after each batch
+      revalidatePath("/");
+      revalidatePath("/folder/:id", "page");
     }
 
     console.log(`Sync completed: ${syncedCount} files synced, ${errorCount} errors`);

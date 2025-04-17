@@ -2,8 +2,9 @@
 
 import { useEffect, useState } from "react";
 import type { UserWithRole } from "~/server/actions/user_action";
-import { getUsers, updateUserRole } from "~/server/actions/user_action";
+import { getUsers, updateUserRole, markUserActive } from "~/server/actions/user_action";
 import { Role } from "@prisma/client";
+import { useAuth } from "@clerk/nextjs";
 import {
   Select,
   SelectContent,
@@ -16,12 +17,27 @@ import { toast } from "sonner";
 export default function UsersPage() {
   const [users, setUsers] = useState<UserWithRole[]>([]);
   const [loading, setLoading] = useState(true);
+  const { userId } = useAuth();
+
+  useEffect(() => {
+    // Mark current user as active
+    if (userId) {
+      void markUserActive(userId);
+    }
+  }, [userId]);
 
   useEffect(() => {
     void loadUsers().catch((error) => {
       console.error("Failed to load users:", error);
       toast.error("Failed to load users");
     });
+
+    // Refresh user list every 30 seconds
+    const interval = setInterval(() => {
+      void loadUsers();
+    }, 30000);
+
+    return () => clearInterval(interval);
   }, []);
 
   async function loadUsers() {

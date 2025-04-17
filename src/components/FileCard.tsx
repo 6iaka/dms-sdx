@@ -71,14 +71,20 @@ const FileCard = ({ data, isSelecting, isSelected, onSelect }: Props) => {
     if (data.mimeType?.startsWith('video/')) {
       return (
         <div className="relative w-full h-full">
-          <Image
-            src={data.thumbnailLink || data.webContentLink}
-            alt={data.title}
-            width={500}
-            height={500}
-            className="w-full h-full object-cover"
-            unoptimized
-          />
+          {data.thumbnailLink ? (
+            <Image
+              src={data.thumbnailLink}
+              alt={data.title}
+              width={500}
+              height={500}
+              className="w-full h-full object-cover"
+              unoptimized
+            />
+          ) : (
+            <div className="w-full h-full bg-gray-100 dark:bg-gray-800 flex items-center justify-center">
+              <FileText className="w-12 h-12 text-gray-500 dark:text-gray-400" />
+            </div>
+          )}
           <div className="absolute inset-0 flex items-center justify-center">
             <div className="rounded-full bg-white/90 p-3 shadow-lg z-10">
               <svg
