@@ -32,23 +32,16 @@ import {
 } from "~/components/ui/select";
 import { Textarea } from "~/components/ui/textarea";
 import { useToast } from "~/hooks/use-toast";
+import { uploadFile } from "~/server/actions/file_action";
 import { getAllTags } from "~/server/actions/tag_action";
 
-interface UploadResponse {
-  success: boolean;
-  error?: string;
-  data?: {
-    id: number;
-    title: string;
-    // Add other file properties as needed
-  };
-}
-
 const formSchema = z.object({
-  file: z.instanceof(File).nullable(),
+  file: z.instanceof(File, { message: "File is required" }),
   tagNames: z.array(z.string()).optional(),
-  description: z.string().min(1).optional(),
+  description: z.string().optional(),
 });
+
+type FormValues = z.infer<typeof formSchema>;
 
 type Props = { folderId?: number };
 
@@ -64,9 +57,9 @@ const FileUploadForm = ({ folderId }: Props) => {
     queryFn: async () => await getAllTags(),
   });
 
-  const form = useForm<z.infer<typeof formSchema>>({
+  const form = useForm<FormValues>({
     resolver: zodResolver(formSchema),
-    defaultValues: { file: null, tagNames: [] },
+    defaultValues: { file: undefined, tagNames: [] },
   });
 
   const handleExternalDrop = async (url: string) => {
@@ -92,43 +85,25 @@ const FileUploadForm = ({ folderId }: Props) => {
     }
   };
 
-  const onSubmit = async (data: z.infer<typeof formSchema>) => {
+  const onSubmit = async (values: FormValues) => {
     try {
       setIsLoading(true);
       const formData = new FormData();
-      
-      if (data.file) {
-        formData.append("file", data.file);
-      }
-      if (folderId) {
-        formData.append("folderId", folderId.toString());
-      }
-      if (data.tagNames) {
-        formData.append("tagNames", JSON.stringify(data.tagNames));
-      }
-      if (data.description) {
-        formData.append("description", data.description);
-      }
+      formData.append("file", values.file);
+      if (folderId) formData.append("folderId", folderId.toString());
+      if (values.tagNames) formData.append("tagNames", JSON.stringify(values.tagNames));
+      if (values.description) formData.append("description", values.description);
 
-      const response = await fetch('/api/upload', {
-        method: 'POST',
-        body: formData,
-      });
-
-      const result = await response.json() as UploadResponse;
-      
-      if (response.ok) {
+      const result = await uploadFile(formData);
+      if (result.success) {
         toast({
           title: "Success",
           description: "File uploaded successfully",
         });
-        // Revalidate the file list
-        await queryClient.invalidateQueries({ queryKey: ["files", folderId] });
-        // Reset form
         form.reset();
         setSelectedTags([]);
-        // Close dialog
         setIsOpen(false);
+        queryClient.invalidateQueries({ queryKey: ["files", folderId] });
       } else {
         toast({
           title: "Error",
@@ -138,10 +113,9 @@ const FileUploadForm = ({ folderId }: Props) => {
       }
     } catch (error) {
       console.error("Upload error:", error);
-      const errorMessage = error instanceof Error ? error.message : "Failed to upload file";
       toast({
         title: "Error",
-        description: errorMessage,
+        description: "Failed to upload file",
         variant: "destructive",
       });
     } finally {
