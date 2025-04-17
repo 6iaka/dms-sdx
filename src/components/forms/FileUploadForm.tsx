@@ -108,6 +108,10 @@ const FileUploadForm = ({ folderId }: Props) => {
         });
         // Revalidate the file list
         await queryClient.invalidateQueries({ queryKey: ["files", folderId] });
+        // Reset form
+        form.reset();
+        setSelectedTags([]);
+        // Close dialog
         setIsOpen(false);
       } else {
         toast({
@@ -118,9 +122,10 @@ const FileUploadForm = ({ folderId }: Props) => {
       }
     } catch (error) {
       console.error("Upload error:", error);
+      const errorMessage = error instanceof Error ? error.message : "Failed to upload file";
       toast({
         title: "Error",
-        description: "Failed to upload file",
+        description: errorMessage,
         variant: "destructive",
       });
     } finally {

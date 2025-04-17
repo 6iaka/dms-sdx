@@ -80,88 +80,100 @@ export const uploadFile = async (formData: FormData) => {
     console.log("File details:", {
       name: file.name,
       size: file.size,
-      type: file.type
+      type: file.type,
+      folderId,
+      tagNames,
+      description
     });
 
-    const targetFolderId = folderId
-      ? (await folderService.findById(parseInt(folderId)))?.googleId
-      : (await driveService.getRootFolder()).id;
-    if (!targetFolderId) throw new Error("Failed to retrieve folderId");
+    try {
+      const targetFolderId = folderId
+        ? (await folderService.findById(parseInt(folderId)))?.googleId
+        : (await driveService.getRootFolder()).id;
+      if (!targetFolderId) throw new Error("Failed to retrieve folderId");
 
-    console.log("Uploading to Google Drive...");
-    const driveFile = await driveService.uploadFile({
-      description,
-      file,
-      folderId: targetFolderId,
-    });
-    if (!driveFile.id) throw new Error("Failed to retrieve file google data");
-    driveFileId = driveFile.id;
-    console.log("Google Drive upload successful:", driveFileId);
+      console.log("Uploading to Google Drive...");
+      const driveFile = await driveService.uploadFile({
+        description,
+        file,
+        folderId: targetFolderId,
+      });
+      if (!driveFile.id) throw new Error("Failed to retrieve file google data");
+      driveFileId = driveFile.id;
+      console.log("Google Drive upload successful:", driveFileId);
 
-    const mimeType = driveFile.mimeType!;
-    const category = getCategoryFromMimeType(mimeType);
-    if (!category) throw new Error("Unrecognized File Type");
+      const mimeType = driveFile.mimeType!;
+      const category = getCategoryFromMimeType(mimeType);
+      if (!category) throw new Error("Unrecognized File Type");
 
-    console.log("Creating database record...");
-    // Create file record without waiting for thumbnail
-    const newFile = await fileService.upsert({
-      ...(tagNames.length > 0 && {
-        tags: {
-          connect: tagNames.map((name) => ({ name })),
-        },
-      }),
-      iconLink: driveFile.iconLink!.replace("16", "64"),
-      folder: { connect: { googleId: targetFolderId } },
-      originalFilename: driveFile.originalFilename!,
-      webContentLink: driveFile.webContentLink!,
-      fileExtension: driveFile.fileExtension!,
-      thumbnailLink: null, // Initialize as null
-      webViewLink: driveFile.webViewLink!,
-      fileSize: Number(driveFile.size),
-      description,
-      mimeType: driveFile.mimeType!,
-      googleId: driveFile.id,
-      title: driveFile.name!,
-      userClerkId: user.id,
-      categeory: category,
-    });
-    console.log("Database record created:", newFile.id);
+      console.log("Creating database record...");
+      // Create file record without waiting for thumbnail
+      const newFile = await fileService.upsert({
+        ...(tagNames.length > 0 && {
+          tags: {
+            connect: tagNames.map((name) => ({ name })),
+          },
+        }),
+        iconLink: driveFile.iconLink!.replace("16", "64"),
+        folder: { connect: { googleId: targetFolderId } },
+        originalFilename: driveFile.originalFilename!,
+        webContentLink: driveFile.webContentLink!,
+        fileExtension: driveFile.fileExtension!,
+        thumbnailLink: null, // Initialize as null
+        webViewLink: driveFile.webViewLink!,
+        fileSize: Number(driveFile.size),
+        description,
+        mimeType: driveFile.mimeType!,
+        googleId: driveFile.id,
+        title: driveFile.name!,
+        userClerkId: user.id,
+        categeory: category,
+      });
+      console.log("Database record created:", newFile.id);
 
-    // Update thumbnail asynchronously
-    if (mimeType.startsWith('video/') || mimeType.startsWith('image/')) {
-      void (async () => {
+      // Update thumbnail asynchronously
+      if (mimeType.startsWith('video/') || mimeType.startsWith('image/')) {
+        void (async () => {
+          try {
+            // For videos, wait a bit longer for thumbnail generation
+            if (mimeType.startsWith('video/')) {
+              await new Promise(resolve => setTimeout(resolve, 5000));
+            }
+            
+            const updatedDriveFile = await driveService.getFile(driveFileId);
+            if (updatedDriveFile.thumbnailLink) {
+              console.log("Updating thumbnail for file:", newFile.id);
+              await fileService.update(newFile.id, {
+                thumbnailLink: updatedDriveFile.thumbnailLink,
+              });
+              console.log("Thumbnail updated successfully");
+            } else {
+              console.log("No thumbnail available for file:", newFile.id);
+            }
+          } catch (error) {
+            console.error('Error updating thumbnail:', error);
+          }
+        })();
+      }
+
+      revalidatePath("/");
+      revalidatePath("/folder/:id", "page");
+
+      return { success: true, data: newFile };
+    } catch (error) {
+      console.error("Error during file upload process:", error);
+      if (driveFileId) {
+        console.log("Cleaning up Google Drive file...");
         try {
-          // For videos, wait a bit longer for thumbnail generation
-          if (mimeType.startsWith('video/')) {
-            await new Promise(resolve => setTimeout(resolve, 5000));
-          }
-          
-          const updatedDriveFile = await driveService.getFile(driveFileId);
-          if (updatedDriveFile.thumbnailLink) {
-            console.log("Updating thumbnail for file:", newFile.id);
-            await fileService.update(newFile.id, {
-              thumbnailLink: updatedDriveFile.thumbnailLink,
-            });
-            console.log("Thumbnail updated successfully");
-          } else {
-            console.log("No thumbnail available for file:", newFile.id);
-          }
-        } catch (error) {
-          console.error('Error updating thumbnail:', error);
+          await driveService.deleteItem(driveFileId);
+        } catch (cleanupError) {
+          console.error("Error cleaning up Google Drive file:", cleanupError);
         }
-      })();
+      }
+      throw error;
     }
-
-    revalidatePath("/");
-    revalidatePath("/folder/:id", "page");
-
-    return { success: true, data: newFile };
   } catch (error) {
     console.error("Upload error:", error);
-    if (driveFileId) {
-      console.log("Cleaning up Google Drive file...");
-      await driveService.deleteItem(driveFileId);
-    }
     return { 
       success: false, 
       error: error instanceof Error ? error.message : "Failed to upload file" 
