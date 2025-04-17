@@ -36,12 +36,10 @@ import { uploadFile } from "~/server/actions/file_action";
 import { getAllTags } from "~/server/actions/tag_action";
 
 const formSchema = z.object({
-  file: z.instanceof(File, { message: "File is required" }),
+  file: z.instanceof(File).nullable(),
   tagNames: z.array(z.string()).optional(),
-  description: z.string().optional(),
+  description: z.string().min(1).optional(),
 });
-
-type FormValues = z.infer<typeof formSchema>;
 
 type Props = { folderId?: number };
 
@@ -57,9 +55,9 @@ const FileUploadForm = ({ folderId }: Props) => {
     queryFn: async () => await getAllTags(),
   });
 
-  const form = useForm<FormValues>({
+  const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
-    defaultValues: { file: undefined, tagNames: [] },
+    defaultValues: { file: null, tagNames: [] },
   });
 
   const handleExternalDrop = async (url: string) => {
@@ -85,14 +83,22 @@ const FileUploadForm = ({ folderId }: Props) => {
     }
   };
 
-  const onSubmit = async (values: FormValues) => {
+  const onSubmit = async (data: z.infer<typeof formSchema>) => {
     try {
       setIsLoading(true);
       const formData = new FormData();
-      formData.append("file", values.file);
-      if (folderId) formData.append("folderId", folderId.toString());
-      if (values.tagNames) formData.append("tagNames", JSON.stringify(values.tagNames));
-      if (values.description) formData.append("description", values.description);
+      if (data.file) {
+        formData.append("file", data.file);
+      }
+      if (folderId) {
+        formData.append("folderId", folderId.toString());
+      }
+      if (data.tagNames) {
+        formData.append("tagNames", JSON.stringify(data.tagNames));
+      }
+      if (data.description) {
+        formData.append("description", data.description);
+      }
 
       const result = await uploadFile(formData);
       if (result.success) {
@@ -100,10 +106,13 @@ const FileUploadForm = ({ folderId }: Props) => {
           title: "Success",
           description: "File uploaded successfully",
         });
+        // Revalidate the file list
+        await queryClient.invalidateQueries({ queryKey: ["files", folderId] });
+        // Reset form
         form.reset();
         setSelectedTags([]);
+        // Close dialog
         setIsOpen(false);
-        queryClient.invalidateQueries({ queryKey: ["files", folderId] });
       } else {
         toast({
           title: "Error",
@@ -113,9 +122,10 @@ const FileUploadForm = ({ folderId }: Props) => {
       }
     } catch (error) {
       console.error("Upload error:", error);
+      const errorMessage = error instanceof Error ? error.message : "Failed to upload file";
       toast({
         title: "Error",
-        description: "Failed to upload file",
+        description: errorMessage,
         variant: "destructive",
       });
     } finally {
