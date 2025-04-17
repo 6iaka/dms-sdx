@@ -43,6 +43,12 @@ const formSchema = z.object({
 
 type Props = { folderId?: number };
 
+type UploadResponse = {
+  success: boolean;
+  data?: any;
+  error?: string;
+};
+
 const FileUploadForm = ({ folderId }: Props) => {
   const { toast } = useToast();
   const [isOpen, setIsOpen] = useState(false);
@@ -87,6 +93,7 @@ const FileUploadForm = ({ folderId }: Props) => {
     try {
       setIsLoading(true);
       const formData = new FormData();
+      
       if (data.file) {
         formData.append("file", data.file);
       }
@@ -100,18 +107,15 @@ const FileUploadForm = ({ folderId }: Props) => {
         formData.append("description", data.description);
       }
 
-      const result = await uploadFile(formData);
+      const result = await uploadFile(formData) as UploadResponse;
       if (result.success) {
         toast({
           title: "Success",
           description: "File uploaded successfully",
         });
-        // Revalidate the file list
         queryClient.invalidateQueries({ queryKey: ["files", folderId] });
-        // Reset form
         form.reset();
         setSelectedTags([]);
-        // Close dialog
         setIsOpen(false);
       } else {
         toast({
