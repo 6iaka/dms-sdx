@@ -32,42 +32,35 @@ import { getAllTags } from "~/server/actions/tag_action";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Badge } from "~/components/ui/badge";
 import { usePermissions } from "~/hooks/usePermissions";
-import { getFolderById } from "~/server/actions/folder_action";
-import { getFilesByFolderId } from "~/server/actions/file_action";
-import type { FolderWithChildren } from "~/types";
 
-type Props = { folderId: number };
+type FolderWithChildren = Folder & {
+  children: Folder[];
+  files: (File & { tags: Tag[] })[];
+};
 
-const FolderPageClient = ({ folderId }: Props) => {
+const FolderPageClient = ({ data }: { data: FolderWithChildren }) => {
   const { toast } = useToast();
   const queryClient = useQueryClient();
-  const { canSelect, canUpload, canCreateFolders, isViewer, canEdit, canDelete } = usePermissions();
+  const { canSelect, canUpload, canCreateFolders, isViewer } = usePermissions();
   const [isSelecting, setIsSelecting] = useState(false);
-  const [selectedFiles, setSelectedFiles] = useState<number[]>([]);
+  const [selectedItems, setSelectedItems] = useState<number[]>([]);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [showTagDialog, setShowTagDialog] = useState(false);
   const [selectedTags, setSelectedTags] = useState<string[]>([]);
   const [showMoveDialog, setShowMoveDialog] = useState(false);
   const [targetFolderId, setTargetFolderId] = useState<number | null>(null);
   const [rootFolder, setRootFolder] = useState<Folder | null>(null);
-  const [folder, setFolder] = useState<FolderWithChildren | null>(null);
-  const [files, setFiles] = useState<(File & { tags: Tag[] })[]>([]);
-  const [isLoading, setIsLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-
-  const { data: folderData } = useQuery({
-    queryKey: ["folder", folderId],
-    queryFn: async () => await getFolderById(folderId),
-  });
-
-  const { data: filesData } = useQuery({
-    queryKey: ["files", folderId],
-    queryFn: async () => await getFilesByFolderId(folderId),
-  });
+  const [folder, setFolder] = useState<FolderWithChildren>(data);
+  const [files, setFiles] = useState<(File & { tags: Tag[] })[]>(data.files || []);
 
   const { data: tags } = useQuery({
     queryKey: ["tags"],
     queryFn: async () => await getAllTags(),
+  });
+
+  const { data: filesData, isLoading: isLoadingFiles } = useQuery({
+    queryKey: ["files", data.id],
+    queryFn: () => getFiles(data.id),
   });
 
   // Fetch root folder
@@ -87,7 +80,7 @@ const FolderPageClient = ({ folderId }: Props) => {
     const loadDataAsync = async () => {
       try {
         const [folderData, tagsData] = await Promise.all([
-          findFolderById(folderId),
+          findFolderById(data.id),
           getAllTags(),
         ]);
         if (folderData) {
@@ -99,38 +92,55 @@ const FolderPageClient = ({ folderId }: Props) => {
       }
     };
     void loadDataAsync();
-  }, [folderId]);
+  }, [data.id]);
 
   const handleSelectAll = () => {
-    const hasSelectedItems = selectedFiles.length > 0;
+    const hasSelectedItems = selectedItems.length > 0;
     if (!hasSelectedItems) {
       const allFileIds = files.map(file => file.id);
-      const allFolderIds = folder?.children.map(child => child.id) || [];
-      setSelectedFiles([...allFileIds, ...allFolderIds]);
+      const allFolderIds = folder.children.map(child => child.id);
+      setSelectedItems([...allFileIds, ...allFolderIds]);
     } else {
-      setSelectedFiles([]);
+      setSelectedItems([]);
     }
   };
 
-  const handleFileSelect = (fileId: number, selected: boolean) => {
+  const handleFolderSelect = (folderId: number, selected: boolean): void => {
     if (selected) {
-      setSelectedFiles([...selectedFiles, fileId]);
+      setSelectedItems(prev => [...prev, folderId]);
     } else {
-      setSelectedFiles(selectedFiles.filter((id) => id !== fileId));
+      setSelectedItems(prev => prev.filter(id => id !== folderId));
     }
   };
 
-  const handleDeleteSelected = async () => {
-    if (!canDelete) return;
+  const handleDelete = async () => {
     try {
-      setIsLoading(true);
-      await deleteFiles(selectedFiles);
-      setSelectedFiles([]);
+      // Delete selected files
+      for (const fileId of selectedItems) {
+        await deleteFile(fileId);
+      }
+      // Delete selected folders
+      for (const folderId of selectedItems.filter(id => typeof id === 'number')) {
+        await deleteFolder(folderId);
+      }
+      toast({
+        title: "Success",
+        description: "Items deleted successfully",
+      });
+      setShowDeleteDialog(false);
+      setSelectedItems([]);
       setIsSelecting(false);
+      // Invalidate queries to refresh the data
+      await queryClient.invalidateQueries({ queryKey: ["files"] });
+      await queryClient.invalidateQueries({ queryKey: ["folders"] });
+      await queryClient.invalidateQueries({ queryKey: ["tags"] });
     } catch (error) {
-      setError(error instanceof Error ? error.message : "Failed to delete files");
-    } finally {
-      setIsLoading(false);
+      console.error("Failed to delete items:", error);
+      toast({
+        title: "Error",
+        description: "Failed to delete items",
+        variant: "destructive",
+      });
     }
   };
 
@@ -139,7 +149,7 @@ const FolderPageClient = ({ folderId }: Props) => {
     
     try {
       await assignTagToFiles({
-        fileIds: selectedFiles,
+        fileIds: selectedItems,
         tagNames: selectedTags,
       });
       toast({
@@ -148,7 +158,7 @@ const FolderPageClient = ({ folderId }: Props) => {
       });
       setShowTagDialog(false);
       setSelectedTags([]);
-      setSelectedFiles([]);
+      setSelectedItems([]);
       setIsSelecting(false);
       await queryClient.invalidateQueries({ queryKey: ["files"] });
       await queryClient.invalidateQueries({ queryKey: ["tags"] });
@@ -167,15 +177,15 @@ const FolderPageClient = ({ folderId }: Props) => {
     
     try {
       // Move selected files
-      if (selectedFiles.length > 0) {
+      if (selectedItems.length > 0) {
         await moveFiles({
-          fileIds: selectedFiles,
+          fileIds: selectedItems,
           targetFolderId,
         });
       }
       // Move selected folders
-      if (selectedFiles.length > 0 && selectedFiles.every(id => typeof id === 'number')) {
-        for (const folderId of selectedFiles.filter(id => typeof id === 'number')) {
+      if (selectedItems.length > 0 && selectedItems.every(id => typeof id === 'number')) {
+        for (const folderId of selectedItems.filter(id => typeof id === 'number')) {
           await moveFolder(folderId, targetFolderId);
         }
       }
@@ -185,7 +195,7 @@ const FolderPageClient = ({ folderId }: Props) => {
       });
       setShowMoveDialog(false);
       setTargetFolderId(null);
-      setSelectedFiles([]);
+      setSelectedItems([]);
       setIsSelecting(false);
       await queryClient.invalidateQueries({ queryKey: ["files"] });
       await queryClient.invalidateQueries({ queryKey: ["folders"] });
@@ -200,10 +210,10 @@ const FolderPageClient = ({ folderId }: Props) => {
 
   // Update existing tags when files are selected
   useEffect(() => {
-    if (selectedFiles.length > 0) {
+    if (selectedItems.length > 0) {
       const tags = new Set<string>();
       files
-        .filter(file => selectedFiles.includes(file.id))
+        .filter(file => selectedItems.includes(file.id))
         .forEach(file => {
           if (file.tags) {
             file.tags.forEach(tag => tags.add(tag.name));
@@ -213,54 +223,89 @@ const FolderPageClient = ({ folderId }: Props) => {
     } else {
       setSelectedTags([]);
     }
-  }, [selectedFiles, files]);
+  }, [selectedItems, files]);
 
   return (
-    <div className="container mx-auto py-8">
-      <div className="mb-8 flex items-center justify-between">
-        <h1 className="text-3xl font-bold">{folder?.title || "Loading..."}</h1>
-        {!isViewer && (
-          <div className="flex gap-4">
-            <Button
-              variant="outline"
-              onClick={() => setIsSelecting(!isSelecting)}
-            >
-              {isSelecting ? "Cancel" : "Select Files"}
+    <>
+      <header className="flex flex-col gap-2 p-4 pb-0">
+        <div className="flex flex-1 items-start justify-between gap-2">
+          {data.parentId ? (
+            <Button variant={"secondary"} className="rounded-full" asChild>
+              <Link href={`/folder/${data.parentId}`}>
+                <ChevronLeft />
+                Back
+              </Link>
             </Button>
-            {isSelecting && selectedFiles.length > 0 && (
-              <Button
-                variant="destructive"
-                onClick={handleDeleteSelected}
-                disabled={isLoading}
-              >
-                Delete Selected
-              </Button>
-            )}
-          </div>
-        )}
-      </div>
+          ) : (
+            <Button variant={"secondary"} className="rounded-full" asChild>
+              <Link href={"/"}>
+                <ChevronLeft />
+                Dashboard
+              </Link>
+            </Button>
+          )}
 
-      {error && (
-        <div className="mb-4 rounded-md bg-red-50 p-4 text-red-700">
-          {error}
+          {!isViewer && (
+            <div className="flex flex-wrap items-center gap-2">
+              {isSelecting && canSelect && (
+                <>
+                  <Button
+                    variant="destructive"
+                    size="sm"
+                    onClick={() => setShowDeleteDialog(true)}
+                  >
+                    <Trash className="mr-2 h-4 w-4" />
+                    Delete
+                  </Button>
+                  <Button
+                    variant="secondary"
+                    size="sm"
+                    onClick={() => setShowTagDialog(true)}
+                  >
+                    Assign Tag
+                  </Button>
+                  <Button
+                    variant="secondary"
+                    size="sm"
+                    onClick={() => setShowMoveDialog(true)}
+                  >
+                    Move
+                  </Button>
+                </>
+              )}
+              {canSelect && (
+                <SelectionMode
+                  onSelect={setIsSelecting}
+                  onSelectAll={handleSelectAll}
+                />
+              )}
+              {!isSelecting && (
+                <>
+                  {canUpload && <FileUploadForm folderId={data.id} />}
+                  {canCreateFolders && <CreateFolderForm parentId={data.id} />}
+                </>
+              )}
+            </div>
+          )}
         </div>
-      )}
+        <h2 className="text-xl font-bold capitalize">{data.title}</h2>
+      </header>
 
       <DropzoneProvider
-        folderId={folderId}
+        folderId={data.id}
         className="flex h-full flex-1 flex-col gap-4 overflow-y-auto p-4"
       >
         <section className="flex flex-col gap-2 rounded-lg">
           <h3 className="text-balance font-medium">Folders</h3>
           <div className="grid w-full grid-cols-[repeat(auto-fill,minmax(14rem,1fr))] gap-2">
-            {folder?.children.length > 0 ? (
-              folder.children.map((item) => (
+            {data.children.length > 0 ? (
+              data.children.map((item) => (
                 <FolderCard 
                   key={item.id}
                   data={{ ...item, files: [] }}
                   isSelecting={isSelecting}
-                  isSelected={selectedFiles.includes(item.id)}
-                  onSelect={(id, selected) => handleFileSelect(id, selected)}
+                  isSelected={selectedItems.includes(item.id)}
+                  onSelect={(id, selected) => handleFolderSelect(id, selected)}
                 />
               ))
             ) : (
@@ -272,14 +317,14 @@ const FolderPageClient = ({ folderId }: Props) => {
         <section className="flex flex-col gap-2 rounded-lg">
           <h3 className="text-balance font-medium">Files</h3>
           <div className="grid w-full grid-cols-[repeat(auto-fill,minmax(9rem,1fr))] gap-2">
-            {files.length > 0 ? (
-              files.map((item) => (
+            {data.files.length > 0 ? (
+              data.files.map((item) => (
                 <FileCard 
                   key={item.id}
                   data={item}
                   isSelecting={isSelecting}
-                  isSelected={selectedFiles.includes(item.id)}
-                  onSelect={(selected: boolean) => handleFileSelect(item.id, selected)}
+                  isSelected={selectedItems.includes(item.id)}
+                  onSelect={(selected: boolean) => handleFolderSelect(item.id, selected)}
                 />
               ))
             ) : (
@@ -294,14 +339,14 @@ const FolderPageClient = ({ folderId }: Props) => {
           <DialogHeader>
             <DialogTitle>Delete Items</DialogTitle>
             <DialogDescription>
-              Are you sure you want to delete {selectedFiles.length} item{selectedFiles.length !== 1 ? "s" : ""}? This action cannot be undone.
+              Are you sure you want to delete {selectedItems.length} item{selectedItems.length !== 1 ? "s" : ""}? This action cannot be undone.
             </DialogDescription>
           </DialogHeader>
           <DialogFooter>
             <Button variant="outline" onClick={() => setShowDeleteDialog(false)}>
               Cancel
             </Button>
-            <Button variant="destructive" onClick={handleDeleteSelected}>
+            <Button variant="destructive" onClick={handleDelete}>
               Delete
             </Button>
           </DialogFooter>
@@ -313,7 +358,7 @@ const FolderPageClient = ({ folderId }: Props) => {
           <DialogHeader>
             <DialogTitle>Assign Tags</DialogTitle>
             <DialogDescription>
-              Select tags to assign to {selectedFiles.length} item{selectedFiles.length !== 1 ? "s" : ""}.
+              Select tags to assign to {selectedItems.length} item{selectedItems.length !== 1 ? "s" : ""}.
             </DialogDescription>
           </DialogHeader>
           <div className="flex flex-col gap-4">
@@ -383,7 +428,7 @@ const FolderPageClient = ({ folderId }: Props) => {
           <DialogHeader>
             <DialogTitle>Move Items</DialogTitle>
             <DialogDescription>
-              Select a folder to move {selectedFiles.length} item{selectedFiles.length !== 1 ? "s" : ""} to.
+              Select a folder to move {selectedItems.length} item{selectedItems.length !== 1 ? "s" : ""} to.
             </DialogDescription>
           </DialogHeader>
           <div className="flex flex-col gap-4">
@@ -402,7 +447,7 @@ const FolderPageClient = ({ folderId }: Props) => {
                       {rootFolder.title}
                     </SelectItem>
                   )}
-                  {folder?.children.map((folder) => (
+                  {data.children.map((folder) => (
                     <SelectItem key={folder.id} value={folder.id.toString()}>
                       {folder.title}
                     </SelectItem>
@@ -419,7 +464,7 @@ const FolderPageClient = ({ folderId }: Props) => {
           </DialogFooter>
         </DialogContent>
       </Dialog>
-    </div>
+    </>
   );
 };
 
