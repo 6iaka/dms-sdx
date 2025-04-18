@@ -97,7 +97,8 @@ export const syncDrive = async () => {
 
     // Then sync all files
     const fileItems = items.filter(
-      (item) => item.mimeType !== "application/vnd.google-apps.folder"
+      (item) => item.mimeType !== "application/vnd.google-apps.folder" && 
+               item.mimeType !== "application/vnd.google-apps.shortcut"
     );
 
     console.log(`Found ${fileItems.length} files to sync`);
@@ -142,7 +143,7 @@ export const syncDrive = async () => {
                   return;
                 }
 
-                // Create the missing parent folder
+                // Create the missing parent folder in our database only
                 await folderService.upsert({
                   parent: parentFolderInDrive.parents?.[0] 
                     ? { connect: { googleId: parentFolderInDrive.parents[0] } }

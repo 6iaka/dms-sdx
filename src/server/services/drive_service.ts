@@ -68,39 +68,62 @@ export class DriveService {
    * @param folderId ID of the folder to get the content of
    * @param allFiles list of files to add the results to
    */
-  fetchFiles = async (folderId: string, allFiles: drive_v3.Schema$File[]) => {
+  fetchFiles = async (folderId: string, allFiles: drive_v3.Schema$File[] = []): Promise<drive_v3.Schema$File[]> => {
     try {
       let pageToken: string | undefined;
       do {
         const response = await this.drive.files.list({
-          q: `'${folderId}' in parents and trashed=false`,
+          q: `'${folderId}' in parents and trashed = false`,
+          fields: "nextPageToken, files(id, name, mimeType, size, description, iconLink, originalFilename, webContentLink, fileExtension, thumbnailLink, webViewLink, parents, shortcutDetails)",
           pageSize: 1000,
-          fields: "nextPageToken, files(id, name, mimeType, parents, description, size, iconLink, originalFilename, webContentLink, fileExtension, thumbnailLink, webViewLink)",
           pageToken,
-          supportsAllDrives: true,
-          includeItemsFromAllDrives: true,
-          corpora: "allDrives"
         });
 
-        const files = response.data.files || [];
-        console.log(`Fetched ${files.length} files from folder ${folderId}`);
-        allFiles.push(...files);
+        const items = response.data.files || [];
+        pageToken = response.data.nextPageToken ?? undefined;
 
-        // Process folders first
-        const folders = files.filter(file => file.mimeType === "application/vnd.google-apps.folder");
-        console.log(`Found ${folders.length} folders to process`);
+        // Process shortcuts first
+        const shortcuts = items.filter(item => item.mimeType === "application/vnd.google-apps.shortcut");
+        for (const shortcut of shortcuts) {
+          if (shortcut.shortcutDetails?.targetId) {
+            // Get the target folder details
+            const targetFolder = await this.getFile(shortcut.shortcutDetails.targetId);
+            if (targetFolder && targetFolder.mimeType === "application/vnd.google-apps.folder") {
+              // Add the shortcut target folder as a child of the current folder
+              allFiles.push({
+                ...targetFolder,
+                parents: [folderId]
+              });
+              // Recursively fetch contents of the target folder
+              await this.fetchFiles(shortcut.shortcutDetails.targetId, allFiles);
+            }
+          }
+        }
+
+        // Process regular folders
+        const folders = items.filter(item => item.mimeType === "application/vnd.google-apps.folder");
         for (const folder of folders) {
           if (folder.id) {
+            // Add the folder to allFiles with current folder as parent
+            allFiles.push({
+              ...folder,
+              parents: [folderId]
+            });
+            // Recursively fetch its contents
             await this.fetchFiles(folder.id, allFiles);
           }
         }
 
-        pageToken = response.data.nextPageToken ?? undefined;
-        if (pageToken) {
-          console.log("Fetching next page...");
-        }
+        // Add non-folder, non-shortcut files
+        const files = items.filter(
+          item => item.mimeType !== "application/vnd.google-apps.folder" && 
+                  item.mimeType !== "application/vnd.google-apps.shortcut"
+        );
+        allFiles.push(...files);
+
       } while (pageToken);
 
+      return allFiles;
     } catch (error) {
       console.error(`Error fetching files from folder ${folderId}:`, error);
       throw new Error((error as Error).message);

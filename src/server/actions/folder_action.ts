@@ -125,32 +125,21 @@ export const deleteFolder = async (id: number) => {
 
   try {
     if (!user) throw new Error("Not authorized");
-    
-    // First get the folder and all its children
+
     const folder = await folderService.findById(id);
     if (!folder) throw new Error("Folder not found");
 
-    // Delete all child folders recursively
-    const deleteChildren = async (folderId: number) => {
-      const children = await folderService.findMany({ parentId: folderId });
-      for (const child of children) {
-        await deleteChildren(child.id);
-        await folderService.delete(child.id);
-        await driveService.deleteItem(child.googleId);
-      }
-    };
-
-    // Delete all children first
-    await deleteChildren(id);
-
-    // Then delete the parent folder
+    // Only delete from our database, not from Google Drive
     const deletedFolder = await folderService.delete(id);
-    await driveService.deleteItem(deletedFolder.googleId);
+    if (!deletedFolder) throw new Error("Failed to delete folder from database");
 
     revalidatePath("/");
     revalidatePath("/folder/:id", "page");
+
+    return deletedFolder;
   } catch (error) {
-    console.error(error);
+    console.error("Error deleting folder:", error);
+    throw error;
   }
 };
 
