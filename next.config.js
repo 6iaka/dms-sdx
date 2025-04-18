@@ -20,10 +20,15 @@ const nextConfig = {
   },
   // Optimize image loading
   images: {
-    domains: ['drive.google.com', 'lh3.googleusercontent.com'],
+    domains: ['lh3.googleusercontent.com', 'drive.google.com'],
     deviceSizes: [640, 750, 828, 1080, 1200, 1920, 2048, 3840],
     imageSizes: [16, 32, 48, 64, 96, 128, 256, 384],
   },
+  api: {
+    bodyParser: {
+      sizeLimit: '50mb'
+    }
+  }
 };
 
 export default nextConfig;

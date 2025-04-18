@@ -1,0 +1,29 @@
+{
+  "functions": {
+    "src/server/actions/**/*.ts": {
+      "memory": 1024,
+      "maxDuration": 60
+    },
+    "src/server/services/**/*.ts": {
+      "memory": 1024,
+      "maxDuration": 60
+    }
+  },
+  "headers": [
+    {
+      "source": "/api/(.*)",
+      "headers": [
+        {
+          "key": "Content-Type",
+          "value": "application/json"
+        }
+      ]
+    }
+  ],
+  "rewrites": [
+    {
+      "source": "/api/:path*",
+      "destination": "/api/:path*"
+    }
+  ]
+} 
