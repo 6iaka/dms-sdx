@@ -1,11 +1,6 @@
 {
   "functions": {
-    "src/server/actions/**/*.ts": {
-      "memory": 1024,
-      "maxDuration": 60
-    },
-    "src/server/services/**/*.ts": {
-      "memory": 1024,
+    "app/api/**/*.ts": {
       "maxDuration": 60
     }
   },
