@@ -147,13 +147,19 @@ export class DriveService {
     try {
       if (!file) throw new Error("No file provided");
 
-      const arrayBuffer = await file.arrayBuffer();
-      const buffer = Buffer.from(arrayBuffer);
+      // For large files, use resumable upload with chunked transfer
+      const uploadType = "resumable"; // Always use resumable for better handling of large files
+      const chunkSize = 5 * 1024 * 1024; // 5MB chunks
 
-      // For large files, use resumable upload
-      const uploadType = file.size > 5 * 1024 * 1024 ? "resumable" : "multipart";
+      console.log("Starting file upload to Google Drive...", {
+        fileName: file.name,
+        fileSize: file.size,
+        uploadType,
+        folderId
+      });
 
-      const response = await this.drive.files.create({
+      // Create the resumable upload session
+      const resumableUpload = await this.drive.files.create({
         requestBody: {
           parents: [folderId],
           description: description,
@@ -161,17 +167,60 @@ export class DriveService {
           name: file.name,
         },
         supportsAllDrives: true,
-        uploadType,
+        uploadType: "resumable",
         media: {
           mimeType: file.type,
-          body: Readable.from(buffer),
         },
+        fields: "id",
+      });
+
+      if (!resumableUpload.data.id) {
+        throw new Error("Failed to create upload session");
+      }
+
+      const uploadUrl = resumableUpload.config.url;
+      if (!uploadUrl) {
+        throw new Error("Failed to get upload URL");
+      }
+
+      // Upload in chunks
+      const arrayBuffer = await file.arrayBuffer();
+      const buffer = Buffer.from(arrayBuffer);
+      let offset = 0;
+
+      while (offset < buffer.length) {
+        const chunk = buffer.slice(offset, offset + chunkSize);
+        const contentLength = chunk.length;
+        const contentRange = `bytes ${offset}-${offset + contentLength - 1}/${buffer.length}`;
+
+        await this.drive.files.update({
+          fileId: resumableUpload.data.id,
+          media: {
+            mimeType: file.type,
+            body: Readable.from(chunk),
+          },
+          uploadType: "resumable",
+          supportsAllDrives: true,
+          requestBody: {
+            parents: [folderId],
+          },
+        });
+
+        offset += contentLength;
+        console.log(`Uploaded ${offset} of ${buffer.length} bytes`);
+      }
+
+      // Get the final file details
+      const response = await this.drive.files.get({
+        fileId: resumableUpload.data.id,
         fields: "id, name, mimeType, webContentLink, webViewLink, iconLink, size, fileExtension, originalFilename",
       });
 
       if (!response.data.id) {
-        throw new Error("Failed to upload file to Google Drive");
+        throw new Error("Failed to get uploaded file details");
       }
+
+      console.log("File uploaded successfully:", response.data.id);
 
       // Set permissions asynchronously
       void this.drive.permissions.create({
@@ -180,11 +229,21 @@ export class DriveService {
           role: "reader",
           type: "anyone",
         },
+      }).catch(error => {
+        console.error("Error setting permissions:", error);
       });
 
       return response.data;
     } catch (error) {
       console.error('Error uploading file:', error);
+      if (error instanceof Error) {
+        console.error("Error details:", {
+          message: error.message,
+          stack: error.stack,
+          fileName: file?.name,
+          fileSize: file?.size
+        });
+      }
       throw new Error(error instanceof Error ? error.message : "Failed to upload file");
     }
   };
