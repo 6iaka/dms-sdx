@@ -151,101 +151,38 @@ export class DriveService {
     try {
       if (!file) throw new Error("No file provided");
 
-      // For large files, use resumable upload with chunked transfer
-      const uploadType = "resumable"; // Always use resumable for better handling of large files
-      const chunkSize = 5 * 1024 * 1024; // 5MB chunks
+      const arrayBuffer = await file.arrayBuffer();
+      const buffer = Buffer.from(arrayBuffer);
+      const stream = Readable.from(buffer);
 
-      console.log("Starting file upload to Google Drive...", {
-        fileName: file.name,
-        fileSize: file.size,
-        uploadType,
-        folderId
-      });
-
-      // Create the resumable upload session
-      const resumableUpload = await this.drive.files.create({
+      const response = await this.drive.files.create({
         requestBody: {
-          name: file.name,
+          parents: [folderId],
           description: description,
           mimeType: file.type,
+          name: file.name,
         },
         supportsAllDrives: true,
         uploadType: "resumable",
         media: {
           mimeType: file.type,
+          body: stream,
         },
-        fields: "id",
+        fields: "*",
       });
 
-      if (!resumableUpload.data.id) {
-        throw new Error("Failed to create upload session");
-      }
-
-      const uploadUrl = resumableUpload.config.url;
-      if (!uploadUrl) {
-        throw new Error("Failed to get upload URL");
-      }
-
-      // Upload in chunks
-      const arrayBuffer = await file.arrayBuffer();
-      const buffer = Buffer.from(arrayBuffer);
-      let offset = 0;
-
-      while (offset < buffer.length) {
-        const chunk = buffer.slice(offset, offset + chunkSize);
-        const contentLength = chunk.length;
-        const contentRange = `bytes ${offset}-${offset + contentLength - 1}/${buffer.length}`;
-
-        await this.drive.files.update({
-          fileId: resumableUpload.data.id,
-          media: {
-            mimeType: file.type,
-            body: Readable.from(chunk),
-          },
-          uploadType: "resumable",
-          supportsAllDrives: true,
-          addParents: folderId,
-        });
-
-        offset += contentLength;
-        console.log(`Uploaded ${offset} of ${buffer.length} bytes`);
-      }
-
-      // Get the final file details
-      const response = await this.drive.files.get({
-        fileId: resumableUpload.data.id,
-        fields: "id, name, mimeType, webContentLink, webViewLink, iconLink, size, fileExtension, originalFilename",
-      });
-
-      if (!response.data.id) {
-        throw new Error("Failed to get uploaded file details");
-      }
-
-      console.log("File uploaded successfully:", response.data.id);
-
-      // Set permissions asynchronously
-      void this.drive.permissions.create({
-        fileId: response.data.id,
+      await this.drive.permissions.create({
+        fileId: response.data.id!,
         requestBody: {
           role: "reader",
           type: "anyone",
         },
-      }).catch(error => {
-        console.error("Error setting permissions:", error);
       });
 
       return response.data;
     } catch (error) {
-      console.error('Error uploading file:', error);
-      if (error instanceof Error) {
-        console.error("Error details:", {
-          message: error.message,
-          stack: error.stack,
-          fileName: file?.name,
-          fileSize: file?.size
-        });
-      }
-      throw new Error(error instanceof Error ? error.message : "Failed to upload file");
+      console.error(error);
+      throw new Error((error as Error).message);
     }
   };
 
