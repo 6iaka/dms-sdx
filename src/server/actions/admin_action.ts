@@ -26,7 +26,51 @@ export const syncDrive = async () => {
 
     console.log(`Found ${items.length} items to sync`);
 
-    // First sync all folders to ensure they exist
+    // First, ensure we have only one root folder
+    const existingRoot = await folderService.findRoot();
+    if (existingRoot) {
+      console.log("Root folder already exists, skipping creation");
+    } else {
+      // Create root folder if it doesn't exist
+      const rootFolder = items.find(item => !item.parents || item.parents.length === 0);
+      if (rootFolder) {
+        await folderService.upsert({
+          googleId: rootFolder.id!,
+          title: rootFolder.name!,
+          description: rootFolder.description,
+          userClerkId: user.id,
+          isRoot: true
+        });
+        console.log("Created root folder");
+      }
+    }
+
+    // Process shortcuts first
+    const shortcuts = items.filter(item => item.mimeType === "application/vnd.google-apps.shortcut");
+    console.log(`Found ${shortcuts.length} shortcuts to process`);
+
+    for (const shortcut of shortcuts) {
+      if (shortcut.shortcutDetails?.targetId) {
+        try {
+          const targetFolder = await driveService.getFile(shortcut.shortcutDetails.targetId);
+          if (targetFolder && targetFolder.mimeType === "application/vnd.google-apps.folder") {
+            // Add the shortcut target folder to our items list
+            items.push({
+              ...targetFolder,
+              parents: shortcut.parents // Maintain the original parent relationship
+            });
+            
+            // Get all contents of the target folder
+            const targetContents = await driveService.fetchFiles(targetFolder.id!);
+            items.push(...targetContents);
+          }
+        } catch (error) {
+          console.error(`Error processing shortcut ${shortcut.name}:`, error);
+        }
+      }
+    }
+
+    // Then sync all folders
     const folderItems = items.filter(
       (item) => item.mimeType === "application/vnd.google-apps.folder"
     );

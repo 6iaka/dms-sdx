@@ -240,6 +240,14 @@ export class FolderService {
       throw new Error((error as Error).message);
     }
   };
+
+  async findRoot() {
+    return await prisma.folder.findFirst({
+      where: {
+        isRoot: true
+      }
+    });
+  }
 }
 
 const folderService = new FolderService();

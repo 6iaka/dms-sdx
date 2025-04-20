@@ -129,7 +129,12 @@ export const deleteFolder = async (id: number) => {
     const folder = await folderService.findById(id);
     if (!folder) throw new Error("Folder not found");
 
-    // Only delete from our database, not from Google Drive
+    // Delete from Google Drive first
+    if (folder.googleId) {
+      await driveService.deleteItem(folder.googleId);
+    }
+
+    // Then delete from our database
     const deletedFolder = await folderService.delete(id);
     if (!deletedFolder) throw new Error("Failed to delete folder from database");
 

@@ -86,16 +86,20 @@ export class DriveService {
         const shortcuts = items.filter(item => item.mimeType === "application/vnd.google-apps.shortcut");
         for (const shortcut of shortcuts) {
           if (shortcut.shortcutDetails?.targetId) {
-            // Get the target folder details
-            const targetFolder = await this.getFile(shortcut.shortcutDetails.targetId);
-            if (targetFolder && targetFolder.mimeType === "application/vnd.google-apps.folder") {
-              // Add the shortcut target folder as a child of the current folder
-              allFiles.push({
-                ...targetFolder,
-                parents: [folderId]
-              });
-              // Recursively fetch contents of the target folder
-              await this.fetchFiles(shortcut.shortcutDetails.targetId, allFiles);
+            try {
+              const targetFolder = await this.getFile(shortcut.shortcutDetails.targetId);
+              if (targetFolder && targetFolder.mimeType === "application/vnd.google-apps.folder") {
+                // Add the shortcut target folder to our items list with the correct parent
+                allFiles.push({
+                  ...targetFolder,
+                  parents: [folderId] // Maintain the original parent relationship
+                });
+                
+                // Recursively fetch contents of the target folder
+                await this.fetchFiles(targetFolder.id!, allFiles);
+              }
+            } catch (error) {
+              console.error(`Error processing shortcut ${shortcut.name}:`, error);
             }
           }
         }
@@ -161,10 +165,9 @@ export class DriveService {
       // Create the resumable upload session
       const resumableUpload = await this.drive.files.create({
         requestBody: {
-          parents: [folderId],
+          name: file.name,
           description: description,
           mimeType: file.type,
-          name: file.name,
         },
         supportsAllDrives: true,
         uploadType: "resumable",
@@ -201,9 +204,7 @@ export class DriveService {
           },
           uploadType: "resumable",
           supportsAllDrives: true,
-          requestBody: {
-            parents: [folderId],
-          },
+          addParents: folderId,
         });
 
         offset += contentLength;

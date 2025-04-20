@@ -1,6 +1,7 @@
 export const dynamic = "force-dynamic";
 import FolderCard from "~/components/FolderCard";
 import SelectionActionBar from "~/components/SelectionActionBar";
+
 import {
   createRootFolder,
   getAllFolders,
@@ -9,14 +10,15 @@ import {
 const HomePage = async () => {
   await createRootFolder();
   const folders = await getAllFolders();
-
   // Filter folders to show only favorites or root-level folders
+
   const filteredFolders = folders?.filter(folder => 
     folder.isFavorite === true || folder.parentId === null
   );
 
   return (
     <>
+
       <header className="flex flex-col gap-2 p-4">
         <div className="flex items-center justify-between">
           <h2 className="scroll-m-20 text-2xl font-semibold tracking-tight first:mt-0">
