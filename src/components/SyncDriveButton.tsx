@@ -1,7 +1,7 @@
 import { RefreshCcw, Loader2 } from "lucide-react";
 import { Button } from "./ui/button";
 import { useTransition } from "react";
-import { syncDrive } from "~/server/actions/admin_action";
+import { quickSync } from "~/server/actions/admin_action";
 import { useToast } from "~/hooks/use-toast";
 import { useState } from "react";
 
@@ -12,7 +12,7 @@ export default function SyncDriveButton() {
   const handleSync = async () => {
     setIsSyncing(true);
     try {
-      const result = await syncDrive();
+      const result = await quickSync();
       if (result.success) {
         toast({
           title: "Drive Sync",
@@ -52,7 +52,7 @@ export default function SyncDriveButton() {
       ) : (
         <>
           <RefreshCcw className="mr-2 h-4 w-4" />
-          Sync Drive
+          Quick Sync
         </>
       )}
     </Button>

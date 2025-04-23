@@ -4,6 +4,7 @@ import { EllipsisVertical, Loader2, Star, Trash } from "lucide-react";
 import { cn } from "~/lib/utils";
 import { deleteFolder, toggleFolderFavorite, editFolder } from "~/server/actions/folder_action";
 import EditFolderForm from "./forms/EditFolderForm";
+import MoveFolderForm from "./forms/MoveFolderForm";
 import { Button } from "./ui/button";
 import { useToast } from "~/hooks/use-toast";
 import { useQueryClient } from "@tanstack/react-query";
@@ -138,7 +139,12 @@ export default function FolderCard({ data, onSelect, isSelected, isSelecting }: 
               className="w-44"
               onClick={(e) => e.stopPropagation()}
             >
-              {canEdit && <EditFolderForm id={data.id} />}
+              {canEdit && (
+                <>
+                  <EditFolderForm id={data.id} />
+                  <MoveFolderForm id={data.id} />
+                </>
+              )}
               <DropdownMenuItem
                 onSelect={() => startTransition(async () => {
                   const result = await toggleFolderFavorite(data.id);

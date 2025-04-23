@@ -23,13 +23,15 @@ model Folder {
   userClerkId String
   description String?
   isRoot      Boolean  @default(false)
+  isShortcut  Boolean  @default(false)
+  parent      Folder?  @relation("FolderToFolder", fields: [parentId], references: [id])
   parentId    Int?
+  children    Folder[] @relation("FolderToFolder")
+  files       File[]
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
   isFavorite  Boolean  @default(false)
-  files       File[]
-  parent      Folder?  @relation("FolderToFolder", fields: [parentId], references: [id])
-  children    Folder[] @relation("FolderToFolder")
+  lastSyncTime DateTime?
 }
 
 model File {

@@ -262,11 +262,46 @@ export class DriveService {
    */
   deleteItem = async (itemId: string) => {
     try {
-      await this.drive.files.delete({ fileId: itemId });
+      // First try to get the file to check permissions
+      const file = await this.drive.files.get({
+        fileId: itemId,
+        fields: 'permissions',
+      });
+
+      // Check if we have delete permission
+      const hasDeletePermission = file.data.permissions?.some(
+        permission => permission.role === 'owner' || permission.role === 'writer'
+      );
+
+      if (!hasDeletePermission) {
+        // If we don't have delete permission, try to add it
+        await this.drive.permissions.create({
+          fileId: itemId,
+          requestBody: {
+            role: 'writer',
+            type: 'user',
+            emailAddress: env.GOOGLE_CLIENT_EMAIL,
+          },
+        });
+      }
+
+      // Now try to delete the file
+      await this.drive.files.delete({ 
+        fileId: itemId,
+        supportsAllDrives: true,
+      });
+      
       return true;
     } catch (error) {
-      console.error(error);
-      throw new Error((error as Error).message);
+      console.error("Error deleting item:", error);
+      if (error instanceof Error) {
+        // Check if it's a permission error
+        if (error.message.includes('insufficient permissions') || 
+            error.message.includes('permission denied')) {
+          throw new Error("You don't have permission to delete this item. Please ensure you have the necessary permissions in Google Drive.");
+        }
+      }
+      throw new Error("Failed to delete item: " + (error instanceof Error ? error.message : "Unknown error"));
     }
   };
 
@@ -349,6 +384,36 @@ export class DriveService {
     } catch (error) {
       console.error('Error getting file:', error);
       throw new Error(error instanceof Error ? error.message : "Failed to get file");
+    }
+  };
+
+  /**
+   * Get items modified after a specific date
+   * @param date The date to check for modifications after
+   * @returns Array of modified items
+   */
+  getItemsModifiedAfter = async (date: Date) => {
+    try {
+      const allItems: drive_v3.Schema$File[] = [];
+      let pageToken: string | undefined;
+
+      do {
+        const response = await this.drive.files.list({
+          q: `modifiedTime > '${date.toISOString()}' and trashed = false`,
+          fields: "nextPageToken, files(id, name, mimeType, size, description, iconLink, originalFilename, webContentLink, fileExtension, thumbnailLink, webViewLink, parents, shortcutDetails, modifiedTime)",
+          pageSize: 1000,
+          pageToken,
+        });
+
+        const items = response.data.files || [];
+        allItems.push(...items);
+        pageToken = response.data.nextPageToken ?? undefined;
+      } while (pageToken);
+
+      return allItems;
+    } catch (error) {
+      console.error("Error in getItemsModifiedAfter:", error);
+      throw new Error((error as Error).message);
     }
   };
 }

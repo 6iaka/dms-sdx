@@ -5,6 +5,7 @@ import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import driveService from "../services/drive_service";
 import folderService from "../services/folder_service";
+import FolderService from "../services/folder_service";
 
 export const getAllFolders = async () => {
   try {
@@ -120,33 +121,44 @@ export const editFolder = async (payload: {
   }
 };
 
-export const deleteFolder = async (id: number) => {
-  const user = await currentUser();
-
+export async function deleteFolder(id: number) {
   try {
-    if (!user) throw new Error("Not authorized");
-
+    // Get the folder from our database
     const folder = await folderService.findById(id);
-    if (!folder) throw new Error("Folder not found");
-
-    // Delete from Google Drive first
-    if (folder.googleId) {
-      await driveService.deleteItem(folder.googleId);
+    if (!folder) {
+      throw new Error("Folder not found in database");
     }
 
-    // Then delete from our database
-    const deletedFolder = await folderService.delete(id);
-    if (!deletedFolder) throw new Error("Failed to delete folder from database");
+    // Delete from Google Drive first
+    try {
+      await driveService.deleteItem(folder.googleId);
+    } catch (error) {
+      // If we can't delete from Google Drive, still try to delete from our database
+      console.error("Error deleting from Google Drive:", error);
+    }
 
+    // Delete from our database
+    await folderService.delete(id);
+
+    // Revalidate the paths
     revalidatePath("/");
-    revalidatePath("/folder/:id", "page");
+    revalidatePath(`/folder/${id}`);
 
-    return deletedFolder;
+    return { success: true };
   } catch (error) {
     console.error("Error deleting folder:", error);
-    throw error;
+    if (error instanceof Error) {
+      return { 
+        success: false, 
+        error: error.message 
+      };
+    }
+    return { 
+      success: false, 
+      error: "An unknown error occurred while deleting the folder" 
+    };
   }
-};
+}
 
 export const searchFolder = async (query: string) => {
   try {
@@ -211,3 +223,12 @@ export const moveFolder = async (folderId: number, targetFolderId: number) => {
     throw error;
   }
 };
+
+export async function getFolders() {
+  try {
+    return await folderService.findMany();
+  } catch (error) {
+    console.error("Error fetching folders:", error);
+    throw new Error("Failed to fetch folders");
+  }
+}
