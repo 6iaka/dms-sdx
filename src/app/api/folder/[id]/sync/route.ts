@@ -4,7 +4,7 @@ import { SyncService } from "~/server/services/sync_service";
 export async function POST(
   request: NextRequest,
   { params }: { params: { id: string } }
-) {
+): Promise<Response> {
   try {
     const syncService = new SyncService();
     await syncService.quickSync(params.id);
