@@ -10,7 +10,7 @@ export class SyncService {
   private fileService = new FileService();
 
   /**
-   * Quick sync that only fetches items modified after the last sync time
+   * Quick sync that fetches all items in the folder and its subfolders
    */
   quickSync = async (folderId: string) => {
     try {
@@ -20,37 +20,40 @@ export class SyncService {
         throw new Error("Folder not found in database");
       }
 
-      // Get the last sync time
-      const lastSyncTime = folder.lastSyncTime || new Date(0);
-
-      // Get items modified after last sync
-      const modifiedItems = await this.driveService.getItemsModifiedAfter(lastSyncTime);
+      // Get all items in the folder and its subfolders
+      const allItems = await this.driveService.listItemsInFolder(folderId, true);
       
-      // Filter items that belong to this folder or its children
-      const relevantItems = modifiedItems.filter(item => {
-        const parents = item.parents || [];
-        return parents.includes(folderId);
-      });
-
-      if (relevantItems.length === 0) {
-        console.log("No new items found in Google Drive");
+      if (allItems.length === 0) {
+        console.log("No items found in Google Drive folder");
         return;
       }
 
-      // Process each modified item
-      for (const item of relevantItems) {
+      // First, process all folders to ensure the folder structure exists
+      const folders = allItems.filter(item => 
+        item.mimeType === "application/vnd.google-apps.folder" || 
+        (item.mimeType === "application/vnd.google-apps.shortcut" && item.shortcutDetails?.targetId)
+      );
+
+      for (const item of folders) {
         if (item.mimeType === "application/vnd.google-apps.folder") {
           // Check if folder already exists in our system
           const existingFolder = await this.folderService.findByGoogleId(item.id!);
           
           if (!existingFolder) {
+            // Find the parent folder in our system
+            const parentFolder = await this.folderService.findByGoogleId(folderId);
+            if (!parentFolder) {
+              console.warn(`Parent folder not found for ${item.name}`);
+              continue;
+            }
+
             // Handle new folder
             await this.folderService.upsert({
               googleId: item.id!,
               title: item.name!,
               userClerkId: folder.userClerkId,
               description: item.description || undefined,
-              parent: { connect: { id: folder.id } },
+              parent: { connect: { id: parentFolder.id } },
               isRoot: false,
               isShortcut: false,
               lastSyncTime: new Date(),
@@ -67,12 +70,19 @@ export class SyncService {
               const existingShortcut = await this.folderService.findByGoogleId(targetFolder.id!);
               
               if (!existingShortcut) {
+                // Find the parent folder in our system
+                const parentFolder = await this.folderService.findByGoogleId(folderId);
+                if (!parentFolder) {
+                  console.warn(`Parent folder not found for shortcut ${item.name}`);
+                  continue;
+                }
+
                 await this.folderService.upsert({
                   googleId: targetFolder.id!,
                   title: targetFolder.name!,
                   userClerkId: folder.userClerkId,
                   description: targetFolder.description || undefined,
-                  parent: { connect: { id: folder.id } },
+                  parent: { connect: { id: parentFolder.id } },
                   isRoot: false,
                   isShortcut: true,
                   lastSyncTime: new Date(),
@@ -82,25 +92,45 @@ export class SyncService {
               }
             }
           }
-        } else {
-          // Handle file
-          await this.fileService.upsert({
-            googleId: item.id!,
-            title: item.name!,
-            userClerkId: folder.userClerkId,
-            folder: { connect: { id: folder.id } },
-            categeory: this.getFileCategory(item.mimeType!),
-            mimeType: item.mimeType!,
-            description: item.description || undefined,
-            webViewLink: item.webViewLink!,
-            webContentLink: item.webContentLink!,
-            thumbnailLink: item.thumbnailLink || undefined,
-            iconLink: item.iconLink!,
-            fileSize: parseInt(item.size || "0"),
-            fileExtension: item.fileExtension || "",
-            originalFilename: item.originalFilename || item.name!,
-          });
         }
+      }
+
+      // Then process all files
+      const files = allItems.filter(item => 
+        item.mimeType !== "application/vnd.google-apps.folder" && 
+        item.mimeType !== "application/vnd.google-apps.shortcut"
+      );
+
+      for (const item of files) {
+        // Find the parent folder in our system
+        const parentFolderId = item.parents?.[0];
+        if (!parentFolderId) {
+          console.warn(`No parent folder found for file ${item.name}`);
+          continue;
+        }
+
+        const parentFolder = await this.folderService.findByGoogleId(parentFolderId);
+        if (!parentFolder) {
+          console.warn(`Parent folder not found for file ${item.name}`);
+          continue;
+        }
+
+        await this.fileService.upsert({
+          googleId: item.id!,
+          title: item.name!,
+          userClerkId: folder.userClerkId,
+          folder: { connect: { id: parentFolder.id } },
+          categeory: this.getFileCategory(item.mimeType!),
+          mimeType: item.mimeType!,
+          description: item.description || undefined,
+          webViewLink: item.webViewLink!,
+          webContentLink: item.webContentLink!,
+          thumbnailLink: item.thumbnailLink || undefined,
+          iconLink: item.iconLink!,
+          fileSize: parseInt(item.size || "0"),
+          fileExtension: item.fileExtension || "",
+          originalFilename: item.originalFilename || item.name!,
+        });
       }
 
       // Update last sync time
@@ -108,7 +138,7 @@ export class SyncService {
         lastSyncTime: new Date(),
       });
 
-      console.log(`Quick sync completed. Processed ${relevantItems.length} items.`);
+      console.log(`Quick sync completed. Processed ${folders.length} folders and ${files.length} files.`);
     } catch (error) {
       console.error("Error in quick sync:", error);
       throw error;

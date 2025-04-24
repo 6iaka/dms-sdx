@@ -416,6 +416,43 @@ export class DriveService {
       throw new Error((error as Error).message);
     }
   };
+
+  /**
+   * List all items in a folder and optionally its subfolders
+   * @param folderId ID of the folder to list items from
+   * @param recursive Whether to include items from subfolders
+   * @returns List of items in the folder
+   */
+  listItemsInFolder = async (folderId: string, recursive: boolean = false): Promise<drive_v3.Schema$File[]> => {
+    try {
+      const allFiles: drive_v3.Schema$File[] = [];
+      
+      if (recursive) {
+        // Use existing fetchFiles method for recursive listing
+        await this.fetchFiles(folderId, allFiles);
+      } else {
+        // List only direct children
+        let pageToken: string | undefined;
+        do {
+          const response = await this.drive.files.list({
+            q: `'${folderId}' in parents and trashed = false`,
+            fields: "nextPageToken, files(id, name, mimeType, size, description, iconLink, originalFilename, webContentLink, fileExtension, thumbnailLink, webViewLink, parents, shortcutDetails)",
+            pageSize: 1000,
+            pageToken,
+          });
+
+          const items = response.data.files || [];
+          allFiles.push(...items);
+          pageToken = response.data.nextPageToken ?? undefined;
+        } while (pageToken);
+      }
+
+      return allFiles;
+    } catch (error) {
+      console.error(`Error listing items in folder ${folderId}:`, error);
+      throw new Error((error as Error).message);
+    }
+  };
 }
 
 const driveService = new DriveService();
