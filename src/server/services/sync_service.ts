@@ -20,6 +20,12 @@ export class SyncService {
         throw new Error("Folder not found in database");
       }
 
+      // Get the root folder
+      const rootFolder = await this.folderService.findRoot();
+      if (!rootFolder) {
+        throw new Error("Root folder not found");
+      }
+
       // Get all items in the folder and its subfolders
       const allItems = await this.driveService.listItemsInFolder(folderId, true);
       
@@ -61,20 +67,20 @@ export class SyncService {
           const existingFolder = await this.folderService.findByGoogleId(item.id!);
           
           if (!existingFolder) {
-            // Handle new folder - always connect to root folder
+            // Handle new folder - connect to root folder but don't mark as root
             await this.folderService.upsert({
               googleId: item.id!,
               title: item.name!,
               userClerkId: folder.userClerkId,
               description: item.description || undefined,
-              parent: { connect: { id: folder.id } }, // Always connect to root folder
-              isRoot: false,
+              parent: { connect: { id: rootFolder.id } }, // Connect to root folder
+              isRoot: false, // Don't mark as root by default
               isShortcut: false,
               lastSyncTime: new Date(),
             });
-          } else if (existingFolder.parentId !== folder.id) {
-            // Always move to root folder
-            await this.folderService.move(existingFolder.id, folder.id);
+          } else if (existingFolder.parentId !== rootFolder.id) {
+            // Move to root folder but preserve root/favorite status
+            await this.folderService.move(existingFolder.id, rootFolder.id);
           }
         } else if (item.mimeType === "application/vnd.google-apps.shortcut") {
           // Handle shortcut
@@ -84,20 +90,20 @@ export class SyncService {
               const existingShortcut = await this.folderService.findByGoogleId(targetFolder.id!);
               
               if (!existingShortcut) {
-                // Handle new shortcut - always connect to root folder
+                // Handle new shortcut - connect to root folder but don't mark as root
                 await this.folderService.upsert({
                   googleId: targetFolder.id!,
                   title: targetFolder.name!,
                   userClerkId: folder.userClerkId,
                   description: targetFolder.description || undefined,
-                  parent: { connect: { id: folder.id } }, // Always connect to root folder
-                  isRoot: false,
+                  parent: { connect: { id: rootFolder.id } }, // Connect to root folder
+                  isRoot: false, // Don't mark as root by default
                   isShortcut: true,
                   lastSyncTime: new Date(),
                 });
-              } else if (existingShortcut.parentId !== folder.id) {
-                // Always move to root folder
-                await this.folderService.move(existingShortcut.id, folder.id);
+              } else if (existingShortcut.parentId !== rootFolder.id) {
+                // Move to root folder but preserve root/favorite status
+                await this.folderService.move(existingShortcut.id, rootFolder.id);
               }
             }
           }
@@ -111,23 +117,31 @@ export class SyncService {
       );
 
       for (const item of files) {
-        // Always connect files to the root folder
-        await this.fileService.upsert({
-          googleId: item.id!,
-          title: item.name!,
-          userClerkId: folder.userClerkId,
-          folder: { connect: { id: folder.id } }, // Always connect to root folder
-          categeory: this.getFileCategory(item.mimeType!),
-          mimeType: item.mimeType!,
-          description: item.description || undefined,
-          webViewLink: item.webViewLink!,
-          webContentLink: item.webContentLink!,
-          thumbnailLink: item.thumbnailLink || undefined,
-          iconLink: item.iconLink!,
-          fileSize: parseInt(item.size || "0"),
-          fileExtension: item.fileExtension || "",
-          originalFilename: item.originalFilename || item.name!,
-        });
+        // Check if file already exists
+        const existingFile = await this.fileService.findByGoogleId(item.id!);
+        
+        if (!existingFile) {
+          // New file - connect to root folder
+          await this.fileService.upsert({
+            googleId: item.id!,
+            title: item.name!,
+            userClerkId: folder.userClerkId,
+            folder: { connect: { id: rootFolder.id } }, // Connect to root folder
+            categeory: this.getFileCategory(item.mimeType!),
+            mimeType: item.mimeType!,
+            description: item.description || undefined,
+            webViewLink: item.webViewLink!,
+            webContentLink: item.webContentLink!,
+            thumbnailLink: item.thumbnailLink || undefined,
+            iconLink: item.iconLink!,
+            fileSize: parseInt(item.size || "0"),
+            fileExtension: item.fileExtension || "",
+            originalFilename: item.originalFilename || item.name!,
+          });
+        } else if (existingFile.folderId !== rootFolder.id) {
+          // Move to root folder
+          await this.fileService.move([existingFile.id], rootFolder.id);
+        }
       }
 
       // Update last sync time
