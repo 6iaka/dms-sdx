@@ -1,9 +1,15 @@
 import { NextRequest, NextResponse } from "next/server";
 import { SyncService } from "~/server/services/sync_service";
 
+type RouteContext = {
+  params: {
+    id: string;
+  };
+};
+
 export async function POST(
   request: NextRequest,
-  context: { params: { id: string } }
+  context: RouteContext
 ): Promise<NextResponse> {
   try {
     const syncService = new SyncService();

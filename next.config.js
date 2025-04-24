@@ -17,9 +17,9 @@ const nextConfig = {
       bodySizeLimit: '500mb',
       allowedOrigins: ['*'],
     },
-    // Configure body size limit for API routes
-    serverComponentsExternalPackages: [],
   },
+  // Configure external packages
+  serverExternalPackages: [],
   // Optimize image loading
   images: {
     domains: ['lh3.googleusercontent.com', 'drive.google.com'],
