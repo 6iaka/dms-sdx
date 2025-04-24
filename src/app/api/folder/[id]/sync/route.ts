@@ -1,19 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
 import { SyncService } from "~/server/services/sync_service";
 
-type RouteContext = {
-  params: {
-    id: string;
-  };
-};
-
 export async function POST(
   request: NextRequest,
-  context: RouteContext
-): Promise<NextResponse> {
+  { params }: { params: { id: string } }
+) {
   try {
     const syncService = new SyncService();
-    await syncService.quickSync(context.params.id);
+    await syncService.quickSync(params.id);
     return NextResponse.json({ success: true });
   } catch (error) {
     console.error("Error in quick sync:", error);
