@@ -423,7 +423,7 @@ export class DriveService {
    * @param recursive Whether to include items from subfolders
    * @returns List of items in the folder
    */
-  listItemsInFolder = async (folderId: string, recursive: boolean = false): Promise<drive_v3.Schema$File[]> => {
+  listItemsInFolder = async (folderId: string, recursive = false): Promise<drive_v3.Schema$File[]> => {
     try {
       const allFiles: drive_v3.Schema$File[] = [];
       
