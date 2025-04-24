@@ -1,6 +1,6 @@
 "use client";
 import { type File as PrismaFile, type Tag } from "@prisma/client";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { toast } from "sonner";
 import { usePermissions } from "~/hooks/usePermissions";
@@ -22,6 +22,10 @@ import Image from "next/image";
 import { useRole } from "~/hooks/use-role";
 import { useRouter } from "next/navigation";
 import { FileText, File as FileIcon } from "lucide-react";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "./ui/dialog";
+import { useToast } from "~/hooks/use-toast";
+import { useTransition } from "react";
+import { Loader2 } from "lucide-react";
 
 type Props = {
   data: PrismaFile & {
@@ -36,6 +40,10 @@ const FileCard = ({ data, isSelecting, isSelected, onSelect }: Props) => {
   const { canEdit, canDelete } = usePermissions();
   const router = useRouter();
   const [isHovered, setIsHovered] = useState(false);
+  const [showDeleteDialog, setShowDeleteDialog] = useState(false);
+  const { toast } = useToast();
+  const [isPending, startTransition] = useTransition();
+  const queryClient = useQueryClient();
 
   const handleClick = (e: React.MouseEvent) => {
     if (isSelecting && onSelect) {
@@ -51,19 +59,20 @@ const FileCard = ({ data, isSelecting, isSelected, onSelect }: Props) => {
     if (!canDelete) return;
     try {
       await deleteFile(data.id);
-      toast.success("File deleted successfully");
+      toast({
+        title: "Success",
+        description: "File deleted successfully",
+      });
+      await queryClient.invalidateQueries({ queryKey: ["files"] });
     } catch (error) {
-      console.error("Error deleting file:", error);
-      const errorMessage =
-        error instanceof Error ? error.message : "Failed to delete file";
-
-      if (errorMessage.includes("File not found")) {
-        toast.error("The file could not be found. It may have been already deleted.");
-      } else if (errorMessage.includes("permissions")) {
-        toast.error("You don't have permission to delete this file.");
-      } else {
-        toast.error(errorMessage);
-      }
+      console.error("Failed to delete file:", error);
+      toast({
+        title: "Error",
+        description: error instanceof Error ? error.message : "Failed to delete file",
+        variant: "destructive",
+      });
+    } finally {
+      setShowDeleteDialog(false);
     }
   };
 
@@ -199,17 +208,50 @@ const FileCard = ({ data, isSelecting, isSelected, onSelect }: Props) => {
               )}
               {canDelete && (
                 <DropdownMenuItem
-                  className="text-destructive"
-                  onClick={handleDelete}
+                  onSelect={(e) => {
+                    e.preventDefault();
+                    setShowDeleteDialog(true);
+                  }}
+                  className="flex items-center gap-2 text-destructive"
                 >
-                  <Trash2 className="mr-2 h-4 w-4" />
-                  Delete
+                  <Trash className="h-4 w-4" />
+                  <span>Delete</span>
                 </DropdownMenuItem>
               )}
             </DropdownMenuContent>
           </DropdownMenu>
         </div>
       )}
+
+      <Dialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Delete File</DialogTitle>
+            <DialogDescription>
+              Are you sure you want to delete this file? This action cannot be undone.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowDeleteDialog(false)}>
+              Cancel
+            </Button>
+            <Button 
+              variant="destructive" 
+              onClick={() => startTransition(handleDelete)}
+              disabled={isPending}
+            >
+              {isPending ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Deleting...
+                </>
+              ) : (
+                "Delete"
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </Card>
   );
 };

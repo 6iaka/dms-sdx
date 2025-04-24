@@ -1,6 +1,6 @@
 "use client";
 import type { Folder, File } from "@prisma/client";
-import { EllipsisVertical, Loader2, Star, Trash } from "lucide-react";
+import { EllipsisVertical, Loader2, Star, Trash, Edit, Move } from "lucide-react";
 import { cn } from "~/lib/utils";
 import { deleteFolder, toggleFolderFavorite, editFolder } from "~/server/actions/folder_action";
 import EditFolderForm from "./forms/EditFolderForm";
@@ -18,6 +18,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "./ui/dropdown-menu";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "./ui/dialog";
 
 type Props = {
   data: Folder & {
@@ -30,6 +31,7 @@ type Props = {
 
 export default function FolderCard({ data, onSelect, isSelected, isSelecting }: Props) {
   const [isHovered, setIsHovered] = useState(false);
+  const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const { toast } = useToast();
   const [isPending, startTransition] = useTransition();
   const queryClient = useQueryClient();
@@ -61,6 +63,8 @@ export default function FolderCard({ data, onSelect, isSelected, isSelecting }: 
         description: "Failed to delete folder",
         variant: "destructive",
       });
+    } finally {
+      setShowDeleteDialog(false);
     }
   };
 
@@ -145,13 +149,25 @@ export default function FolderCard({ data, onSelect, isSelected, isSelecting }: 
 
             <DropdownMenuContent
               align="start"
-              className="w-44"
+              className="w-48"
               onClick={(e) => e.stopPropagation()}
             >
               {canEdit && (
                 <>
-                  <EditFolderForm id={data.id} />
-                  <MoveFolderForm id={data.id} />
+                  <DropdownMenuItem
+                    onSelect={(e) => e.preventDefault()}
+                    className="flex items-center gap-2"
+                  >
+                    <Edit className="h-4 w-4" />
+                    <span>Rename</span>
+                  </DropdownMenuItem>
+                  <DropdownMenuItem
+                    onSelect={(e) => e.preventDefault()}
+                    className="flex items-center gap-2"
+                  >
+                    <Move className="h-4 w-4" />
+                    <span>Move</span>
+                  </DropdownMenuItem>
                 </>
               )}
               <DropdownMenuItem
@@ -174,21 +190,54 @@ export default function FolderCard({ data, onSelect, isSelected, isSelecting }: 
                 className="flex items-center gap-2"
               >
                 <Star className="h-4 w-4" />
-                <span className="flex-1">{data.isFavorite ? "Remove from favorites" : "Add to favorites"}</span>
+                <span>{data.isFavorite ? "Remove from favorites" : "Add to favorites"}</span>
               </DropdownMenuItem>
               {canDelete && (
                 <DropdownMenuItem
-                  onSelect={() => startTransition(handleDelete)}
-                  className="flex items-center gap-2"
+                  onSelect={(e) => {
+                    e.preventDefault();
+                    setShowDeleteDialog(true);
+                  }}
+                  className="flex items-center gap-2 text-destructive"
                 >
                   <Trash className="h-4 w-4" />
-                  <span className="flex-1">Delete</span>
+                  <span>Delete</span>
                 </DropdownMenuItem>
               )}
             </DropdownMenuContent>
           </DropdownMenu>
         )}
       </div>
+
+      <Dialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Delete Folder</DialogTitle>
+            <DialogDescription>
+              Are you sure you want to delete this folder? This action cannot be undone.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowDeleteDialog(false)}>
+              Cancel
+            </Button>
+            <Button 
+              variant="destructive" 
+              onClick={() => startTransition(handleDelete)}
+              disabled={isPending}
+            >
+              {isPending ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Deleting...
+                </>
+              ) : (
+                "Delete"
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
