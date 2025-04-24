@@ -37,14 +37,23 @@ export default function FolderCard({ data, onSelect, isSelected, isSelecting }: 
   const { canEdit, canDelete } = usePermissions();
 
   const handleDelete = async () => {
+    if (!canDelete) return;
     try {
-      await deleteFolder(data.id);
-      toast({
-        title: "Success",
-        description: "Folder deleted successfully",
-      });
-      await queryClient.invalidateQueries({ queryKey: ["folders"] });
-      await queryClient.invalidateQueries({ queryKey: ["files"] });
+      const result = await deleteFolder(data.id);
+      if (result.success) {
+        toast({
+          title: "Success",
+          description: "Folder deleted successfully",
+        });
+        await queryClient.invalidateQueries({ queryKey: ["folders"] });
+        await queryClient.invalidateQueries({ queryKey: ["files"] });
+      } else {
+        toast({
+          title: "Error",
+          description: result.error || "Failed to delete folder",
+          variant: "destructive",
+        });
+      }
     } catch (error) {
       console.error("Failed to delete folder:", error);
       toast({

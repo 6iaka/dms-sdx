@@ -115,14 +115,24 @@ const FolderPageClient = ({ data }: { data: FolderWithChildren }) => {
 
   const handleDelete = async () => {
     try {
+      // Separate files and folders from selected items
+      const selectedFiles = selectedItems.filter(id => 
+        files.some(file => file.id === id)
+      );
+      const selectedFolders = selectedItems.filter(id => 
+        folder.children.some(child => child.id === id)
+      );
+
       // Delete selected files
-      for (const fileId of selectedItems) {
+      for (const fileId of selectedFiles) {
         await deleteFile(fileId);
       }
+
       // Delete selected folders
-      for (const folderId of selectedItems.filter(id => typeof id === 'number')) {
+      for (const folderId of selectedFolders) {
         await deleteFolder(folderId);
       }
+
       toast({
         title: "Success",
         description: "Items deleted successfully",

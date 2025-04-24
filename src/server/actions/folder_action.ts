@@ -6,6 +6,7 @@ import { z } from "zod";
 import driveService from "../services/drive_service";
 import folderService from "../services/folder_service";
 import FolderService from "../services/folder_service";
+import fileService from "../services/file_service";
 
 export const getAllFolders = async () => {
   try {
@@ -127,6 +128,29 @@ export async function deleteFolder(id: number) {
     const folder = await folderService.findById(id);
     if (!folder) {
       throw new Error("Folder not found in database");
+    }
+
+    // Get all child folders and files
+    const childFolders = await folderService.findByParentId(id);
+    const childFiles = await fileService.findByFolderId(id);
+
+    // Recursively delete all child folders
+    for (const childFolder of childFolders) {
+      await deleteFolder(childFolder.id);
+    }
+
+    // Delete all child files
+    for (const childFile of childFiles) {
+      try {
+        // Delete from Google Drive first
+        if (childFile.googleId) {
+          await driveService.deleteItem(childFile.googleId);
+        }
+        // Then delete from our database
+        await fileService.delete(childFile.id);
+      } catch (error) {
+        console.error(`Error deleting file ${childFile.id}:`, error);
+      }
     }
 
     // Delete from Google Drive first
