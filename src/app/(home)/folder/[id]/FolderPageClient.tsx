@@ -26,7 +26,7 @@ import {
   SelectValue,
 } from "~/components/ui/select";
 import { useToast } from "~/hooks/use-toast";
-import { deleteFile, assignTagToFiles, moveFiles, getFiles } from "~/server/actions/file_action";
+import { deleteFile, deleteFiles, assignTagToFiles, moveFiles, getFiles } from "~/server/actions/file_action";
 import { deleteFolder, moveFolder, createRootFolder, findFolderById } from "~/server/actions/folder_action";
 import { getAllTags } from "~/server/actions/tag_action";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
@@ -123,9 +123,9 @@ const FolderPageClient = ({ data }: { data: FolderWithChildren }) => {
         folder.children.some(child => child.id === id)
       );
 
-      // Delete selected files
-      for (const fileId of selectedFiles) {
-        await deleteFile(fileId);
+      // Delete selected files in bulk
+      if (selectedFiles.length > 0) {
+        await deleteFiles(selectedFiles);
       }
 
       // Delete selected folders
