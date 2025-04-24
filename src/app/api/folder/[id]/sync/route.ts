@@ -1,12 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import { SyncService } from "~/server/services/sync_service";
 
-type RouteHandler = (
+export async function POST(
   request: NextRequest,
-  context: { params: { id: string } }
-) => Promise<Response>;
-
-export const POST: RouteHandler = async (request, { params }) => {
+  { params }: { params: { id: string } }
+) {
   try {
     const syncService = new SyncService();
     await syncService.quickSync(params.id);
@@ -18,7 +16,7 @@ export const POST: RouteHandler = async (request, { params }) => {
       { status: 500 }
     );
   }
-};
+}
 
 // Add type declaration for the route
 declare module "next/server" {
