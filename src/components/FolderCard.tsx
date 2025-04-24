@@ -41,21 +41,24 @@ export default function FolderCard({ data, onSelect, isSelected, isSelecting }: 
   const handleDelete = async () => {
     if (!canDelete) return;
     try {
-      const result = await deleteFolder(data.id);
-      if (result.success) {
-        toast({
-          title: "Success",
-          description: "Folder deleted successfully",
-        });
-        await queryClient.invalidateQueries({ queryKey: ["folders"] });
-        await queryClient.invalidateQueries({ queryKey: ["files"] });
-      } else {
-        toast({
-          title: "Error",
-          description: result.error || "Failed to delete folder",
-          variant: "destructive",
-        });
-      }
+      startTransition(async () => {
+        const result = await deleteFolder(data.id);
+        if (result.success) {
+          toast({
+            title: "Success",
+            description: "Folder deleted successfully",
+          });
+          await queryClient.invalidateQueries({ queryKey: ["folders"] });
+          await queryClient.invalidateQueries({ queryKey: ["files"] });
+        } else {
+          toast({
+            title: "Error",
+            description: result.error || "Failed to delete folder",
+            variant: "destructive",
+          });
+        }
+        setShowDeleteDialog(false);
+      });
     } catch (error) {
       console.error("Failed to delete folder:", error);
       toast({
@@ -63,8 +66,6 @@ export default function FolderCard({ data, onSelect, isSelected, isSelecting }: 
         description: "Failed to delete folder",
         variant: "destructive",
       });
-    } finally {
-      setShowDeleteDialog(false);
     }
   };
 
@@ -80,7 +81,7 @@ export default function FolderCard({ data, onSelect, isSelected, isSelecting }: 
   return (
     <div
       className={cn(
-        "group relative flex items-center gap-2 rounded-lg bg-card p-2 transition-all hover:bg-secondary/25",
+        "group relative flex items-center gap-2 rounded-lg bg-card p-2 transition-all hover:bg-secondary/25 cursor-pointer",
         isSelecting && "cursor-pointer",
         isSelected && "bg-primary/10 hover:bg-primary/20"
       )}

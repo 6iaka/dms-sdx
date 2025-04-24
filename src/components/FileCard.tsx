@@ -58,12 +58,15 @@ const FileCard = ({ data, isSelecting, isSelected, onSelect }: Props) => {
   const handleDelete = async () => {
     if (!canDelete) return;
     try {
-      await deleteFile(data.id);
-      toast({
-        title: "Success",
-        description: "File deleted successfully",
+      startTransition(async () => {
+        await deleteFile(data.id);
+        toast({
+          title: "Success",
+          description: "File deleted successfully",
+        });
+        await queryClient.invalidateQueries({ queryKey: ["files"] });
+        setShowDeleteDialog(false);
       });
-      await queryClient.invalidateQueries({ queryKey: ["files"] });
     } catch (error) {
       console.error("Failed to delete file:", error);
       toast({
@@ -71,8 +74,6 @@ const FileCard = ({ data, isSelecting, isSelected, onSelect }: Props) => {
         description: error instanceof Error ? error.message : "Failed to delete file",
         variant: "destructive",
       });
-    } finally {
-      setShowDeleteDialog(false);
     }
   };
 
@@ -160,7 +161,7 @@ const FileCard = ({ data, isSelecting, isSelected, onSelect }: Props) => {
   return (
     <Card
       className={cn(
-        "group relative overflow-hidden transition-all hover:shadow-md",
+        "group relative overflow-hidden transition-all hover:shadow-md cursor-pointer",
         isSelected && "ring-2 ring-primary"
       )}
       onMouseEnter={() => setIsHovered(true)}

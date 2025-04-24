@@ -24,7 +24,7 @@ const SelectionMode = ({ onSelect, onSelectAll }: Props) => {
           <Button
             variant="ghost"
             size="sm"
-            className="rounded-full"
+            className="rounded-full cursor-pointer"
             onClick={() => toggleSelection(false)}
           >
             <X className="mr-2 h-4 w-4" />
@@ -34,7 +34,7 @@ const SelectionMode = ({ onSelect, onSelectAll }: Props) => {
             <Button
               variant="ghost"
               size="sm"
-              className="rounded-full"
+              className="rounded-full cursor-pointer"
               onClick={onSelectAll}
             >
               <Check className="mr-2 h-4 w-4" />
@@ -46,7 +46,7 @@ const SelectionMode = ({ onSelect, onSelectAll }: Props) => {
         <Button
           variant="ghost"
           size="sm"
-          className="rounded-full"
+          className="rounded-full cursor-pointer"
           onClick={() => toggleSelection(true)}
         >
           <Check className="mr-2 h-4 w-4" />

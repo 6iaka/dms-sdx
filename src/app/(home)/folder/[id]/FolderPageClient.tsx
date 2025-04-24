@@ -1,7 +1,7 @@
 "use client";
-import { ChevronLeft, Trash, X } from "lucide-react";
+import { ChevronLeft, Trash, X, Loader2 } from "lucide-react";
 import Link from "next/link";
-import { useState, useEffect } from "react";
+import { useState, useEffect, startTransition, useTransition } from "react";
 import type { File, Folder, Tag } from "@prisma/client";
 import DropzoneProvider from "~/components/DropzoneProvider";
 import FileCard from "~/components/FileCard";
@@ -52,6 +52,7 @@ const FolderPageClient = ({ data }: { data: FolderWithChildren }) => {
   const [rootFolder, setRootFolder] = useState<Folder | null>(null);
   const [folder, setFolder] = useState<FolderWithChildren>(data);
   const [files, setFiles] = useState<(File & { tags: Tag[] })[]>(data.files || []);
+  const [isPending, startTransition] = useTransition();
 
   const { data: tags } = useQuery({
     queryKey: ["tags"],
@@ -115,35 +116,37 @@ const FolderPageClient = ({ data }: { data: FolderWithChildren }) => {
 
   const handleDelete = async () => {
     try {
-      // Separate files and folders from selected items
-      const selectedFiles = selectedItems.filter(id => 
-        files.some(file => file.id === id)
-      );
-      const selectedFolders = selectedItems.filter(id => 
-        folder.children.some(child => child.id === id)
-      );
+      startTransition(async () => {
+        // Separate files and folders from selected items
+        const selectedFiles = selectedItems.filter(id => 
+          files.some(file => file.id === id)
+        );
+        const selectedFolders = selectedItems.filter(id => 
+          folder.children.some(child => child.id === id)
+        );
 
-      // Delete selected files in bulk
-      if (selectedFiles.length > 0) {
-        await deleteFiles(selectedFiles);
-      }
+        // Delete selected files in bulk
+        if (selectedFiles.length > 0) {
+          await deleteFiles(selectedFiles);
+        }
 
-      // Delete selected folders
-      for (const folderId of selectedFolders) {
-        await deleteFolder(folderId);
-      }
+        // Delete selected folders
+        for (const folderId of selectedFolders) {
+          await deleteFolder(folderId);
+        }
 
-      toast({
-        title: "Success",
-        description: "Items deleted successfully",
+        toast({
+          title: "Success",
+          description: "Items deleted successfully",
+        });
+        setShowDeleteDialog(false);
+        setSelectedItems([]);
+        setIsSelecting(false);
+        // Invalidate queries to refresh the data
+        await queryClient.invalidateQueries({ queryKey: ["files"] });
+        await queryClient.invalidateQueries({ queryKey: ["folders"] });
+        await queryClient.invalidateQueries({ queryKey: ["tags"] });
       });
-      setShowDeleteDialog(false);
-      setSelectedItems([]);
-      setIsSelecting(false);
-      // Invalidate queries to refresh the data
-      await queryClient.invalidateQueries({ queryKey: ["files"] });
-      await queryClient.invalidateQueries({ queryKey: ["folders"] });
-      await queryClient.invalidateQueries({ queryKey: ["tags"] });
     } catch (error) {
       console.error("Failed to delete items:", error);
       toast({
@@ -356,8 +359,19 @@ const FolderPageClient = ({ data }: { data: FolderWithChildren }) => {
             <Button variant="outline" onClick={() => setShowDeleteDialog(false)}>
               Cancel
             </Button>
-            <Button variant="destructive" onClick={handleDelete}>
-              Delete
+            <Button 
+              variant="destructive" 
+              onClick={handleDelete}
+              disabled={isPending}
+            >
+              {isPending ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Deleting...
+                </>
+              ) : (
+                "Delete"
+              )}
             </Button>
           </DialogFooter>
         </DialogContent>

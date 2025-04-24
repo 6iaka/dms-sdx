@@ -168,7 +168,7 @@ export class DriveService {
           mimeType: file.type,
           body: stream,
         },
-        fields: "*",
+        fields: "id, name, mimeType, thumbnailLink, webContentLink, webViewLink, iconLink, size, fileExtension, originalFilename",
       });
 
       await this.drive.permissions.create({
@@ -361,17 +361,17 @@ export class DriveService {
     try {
       const response = await this.drive.files.get({
         fileId,
-        fields: 'id, name, mimeType, thumbnailLink, webContentLink, webViewLink, iconLink, size, fileExtension, originalFilename',
+        fields: "id, name, mimeType, thumbnailLink, webContentLink, webViewLink, iconLink, size, fileExtension, originalFilename",
       });
 
       // For videos, if no thumbnail is available, wait and try again
       if (response.data.mimeType?.startsWith('video/') && !response.data.thumbnailLink) {
         console.log("Waiting for video thumbnail generation...");
-        await new Promise(resolve => setTimeout(resolve, 2000));
+        await new Promise(resolve => setTimeout(resolve, 5000));
         
         const retryResponse = await this.drive.files.get({
           fileId,
-          fields: 'id, name, mimeType, thumbnailLink, webContentLink, webViewLink, iconLink, size, fileExtension, originalFilename',
+          fields: "id, name, mimeType, thumbnailLink, webContentLink, webViewLink, iconLink, size, fileExtension, originalFilename",
         });
         
         if (retryResponse.data.thumbnailLink) {
