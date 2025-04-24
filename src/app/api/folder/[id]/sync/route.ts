@@ -3,11 +3,12 @@ import { SyncService } from "~/server/services/sync_service";
 
 export async function POST(
   request: NextRequest,
-  { params }: { params: { id: string } }
-) {
+  { params }: { params: Promise<{ id: string }> }
+): Promise<NextResponse> {
   try {
+    const { id } = await params;
     const syncService = new SyncService();
-    await syncService.quickSync(params.id);
+    await syncService.quickSync(id);
     return NextResponse.json({ success: true });
   } catch (error) {
     console.error("Error in quick sync:", error);
