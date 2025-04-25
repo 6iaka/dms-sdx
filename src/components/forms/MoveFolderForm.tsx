@@ -27,9 +27,10 @@ import { Move } from "lucide-react";
 
 type Props = {
   id: number;
+  onSuccess?: () => void;
 };
 
-export default function MoveFolderForm({ id }: Props) {
+export default function MoveFolderForm({ id, onSuccess }: Props) {
   const [open, setOpen] = useState(false);
   const [targetFolderId, setTargetFolderId] = useState<string>();
   const { toast } = useToast();
@@ -54,6 +55,7 @@ export default function MoveFolderForm({ id }: Props) {
       });
       await queryClient.invalidateQueries({ queryKey: ["folders"] });
       setOpen(false);
+      onSuccess?.();
     } catch (error) {
       console.error("Failed to move folder:", error);
       toast({

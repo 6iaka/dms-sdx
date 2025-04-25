@@ -8,10 +8,10 @@ export async function POST(
   try {
     const { id } = await params;
     const syncService = new SyncService();
-    await syncService.quickSync(id);
+    await syncService.syncFolder(id);
     return NextResponse.json({ success: true });
   } catch (error) {
-    console.error("Error in quick sync:", error);
+    console.error("Error in folder sync:", error);
     return NextResponse.json(
       { error: "Failed to sync folder" },
       { status: 500 }

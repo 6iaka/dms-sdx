@@ -82,6 +82,9 @@ export class DriveService {
         const items = response.data.files || [];
         pageToken = response.data.nextPageToken ?? undefined;
 
+        // Add all items to allFiles first
+        allFiles.push(...items);
+
         // Process shortcuts first
         const shortcuts = items.filter(item => item.mimeType === "application/vnd.google-apps.shortcut");
         for (const shortcut of shortcuts) {
@@ -89,12 +92,6 @@ export class DriveService {
             try {
               const targetFolder = await this.getFile(shortcut.shortcutDetails.targetId);
               if (targetFolder && targetFolder.mimeType === "application/vnd.google-apps.folder") {
-                // Add the shortcut target folder to our items list with the correct parent
-                allFiles.push({
-                  ...targetFolder,
-                  parents: [folderId] // Maintain the original parent relationship
-                });
-                
                 // Recursively fetch contents of the target folder
                 await this.fetchFiles(targetFolder.id!, allFiles);
               }
@@ -108,22 +105,10 @@ export class DriveService {
         const folders = items.filter(item => item.mimeType === "application/vnd.google-apps.folder");
         for (const folder of folders) {
           if (folder.id) {
-            // Add the folder to allFiles with current folder as parent
-            allFiles.push({
-              ...folder,
-              parents: [folderId]
-            });
             // Recursively fetch its contents
             await this.fetchFiles(folder.id, allFiles);
           }
         }
-
-        // Add non-folder, non-shortcut files
-        const files = items.filter(
-          item => item.mimeType !== "application/vnd.google-apps.folder" && 
-                  item.mimeType !== "application/vnd.google-apps.shortcut"
-        );
-        allFiles.push(...files);
 
       } while (pageToken);
 

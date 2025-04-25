@@ -1,6 +1,19 @@
 "use client";
 import type { Folder, File } from "@prisma/client";
-import { EllipsisVertical, Loader2, Star, Trash, Edit, Move } from "lucide-react";
+import { 
+  EllipsisVertical, 
+  Loader2, 
+  Star, 
+  Trash, 
+  Edit, 
+  Move, 
+  MoreVertical, 
+  Folder as FolderIcon,
+  Pencil,
+  RefreshCw,
+  Share2,
+  Trash2
+} from "lucide-react";
 import { cn } from "~/lib/utils";
 import { deleteFolder, toggleFolderFavorite, editFolder } from "~/server/actions/folder_action";
 import EditFolderForm from "./forms/EditFolderForm";
@@ -19,6 +32,17 @@ import {
   DropdownMenuTrigger,
 } from "./ui/dropdown-menu";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "./ui/dialog";
+import { useDrag, useDrop } from "react-dnd";
+import { ItemTypes } from "~/lib/constants";
+import { toast } from "sonner";
+import { moveFolder } from "~/server/actions/folder_action";
+import {
+  Badge,
+  BadgeProps,
+} from "./ui/badge";
+import {
+  DropdownMenuSeparator,
+} from "./ui/dropdown-menu";
 
 type Props = {
   data: Folder & {
@@ -32,11 +56,20 @@ type Props = {
 export default function FolderCard({ data, onSelect, isSelected, isSelecting }: Props) {
   const [isHovered, setIsHovered] = useState(false);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
+  const [showRenameDialog, setShowRenameDialog] = useState(false);
+  const [showMoveDialog, setShowMoveDialog] = useState(false);
+  const [showSyncDialog, setShowSyncDialog] = useState(false);
+  const [showShareDialog, setShowShareDialog] = useState(false);
+  const [isSyncing, setIsSyncing] = useState(false);
   const { toast } = useToast();
   const [isPending, startTransition] = useTransition();
   const queryClient = useQueryClient();
   const router = useRouter();
   const { canEdit, canDelete } = usePermissions();
+  const [isMoving, setIsMoving] = useState(false);
+  const [isDropdownOpen, setIsDropdownOpen] = useState(false);
+
+  const isRootFolder = data.parentId === null;
 
   const handleDelete = async () => {
     if (!canDelete) return;
@@ -78,137 +111,203 @@ export default function FolderCard({ data, onSelect, isSelected, isSelecting }: 
     }
   };
 
+  const handleFavorite = (e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    onSelect?.(data.id, !data.isFavorite);
+  };
+
+  const [{ isDragging }, drag] = useDrag(() => ({
+    type: ItemTypes.FOLDER,
+    item: { id: data.id, type: ItemTypes.FOLDER },
+    collect: (monitor) => ({
+      isDragging: !!monitor.isDragging(),
+    }),
+  }));
+
+  const [{ isOver }, drop] = useDrop(() => ({
+    accept: ItemTypes.FOLDER,
+    drop: async (item: { id: number; type: string }) => {
+      if (item.id === data.id) return; // Don't allow dropping on itself
+      try {
+        setIsMoving(true);
+        await moveFolder(item.id, data.id);
+        toast({
+          title: "Success",
+          description: "Folder moved successfully",
+        });
+        onSelect?.(data.id, !isSelected);
+      } catch (error) {
+        toast({
+          title: "Error",
+          description: "Failed to move folder",
+          variant: "destructive",
+        });
+        console.error("Error moving folder:", error);
+      } finally {
+        setIsMoving(false);
+      }
+    },
+    collect: (monitor) => ({
+      isOver: !!monitor.isOver(),
+    }),
+  }));
+
+  const handleRename = async (newTitle: string) => {
+    try {
+      await editFolder({ id: data.id, title: newTitle });
+      toast({
+        title: "Success",
+        description: "Folder renamed successfully",
+      });
+      await queryClient.invalidateQueries({ queryKey: ["folders"] });
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Failed to rename folder",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const handleSync = async () => {
+    setIsSyncing(true);
+    try {
+      const response = await fetch(`/api/folder/${data.id}/sync`, {
+        method: "POST",
+      });
+      if (!response.ok) throw new Error("Sync failed");
+      toast({
+        title: "Success",
+        description: "Folder synced successfully",
+      });
+      await queryClient.invalidateQueries({ queryKey: ["folders"] });
+      await queryClient.invalidateQueries({ queryKey: ["files"] });
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Failed to sync folder",
+        variant: "destructive",
+      });
+    } finally {
+      setIsSyncing(false);
+    }
+  };
+
+  const handleSyncClick = (e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    void handleSync();
+  };
+
   return (
     <div
+      ref={(node) => {
+        drag(node);
+        drop(node);
+      }}
       className={cn(
-        "group relative flex items-center gap-2 rounded-lg bg-card p-2 transition-all hover:bg-secondary/25 cursor-pointer",
-        isSelecting && "cursor-pointer",
-        isSelected && "bg-primary/10 hover:bg-primary/20"
+        "relative group cursor-pointer transition-all duration-200",
+        isDragging && "opacity-50",
+        isOver && "ring-2 ring-primary"
       )}
-      onClick={handleClick}
     >
-      {isSelecting && (
-        <div
-          className="absolute left-2 top-2 z-10"
+      <div 
+        className={cn(
+          "flex items-center justify-between p-2 hover:bg-muted rounded-lg",
+          isSelected && "bg-primary/10 ring-2 ring-primary"
+        )}
+        onClick={handleClick}
+      >
+        <div className="flex items-center gap-2">
+          <FolderIcon className="h-8 w-8 text-yellow-500 fill-yellow-500" />
+          <span className="text-sm font-medium">{data.title}</span>
+        </div>
+        <div 
+          className="flex items-center space-x-2"
           onClick={(e) => e.stopPropagation()}
         >
-          <input
-            type="checkbox"
-            checked={isSelected}
-            onChange={(e) => {
-              e.stopPropagation();
-              onSelect?.(data.id, e.target.checked);
-            }}
-            className="h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary"
-          />
-        </div>
-      )}
-      <svg
-        xmlns="http://www.w3.org/2000/svg"
-        x="0px"
-        y="0px"
-        width="100"
-        height="100"
-        viewBox="0 0 48 48"
-        className="size-10 flex-shrink-0 transition-all group-hover:-translate-y-1"
-      >
-        <path
-          fill="#FFA000"
-          d="M38,12H22l-4-4H8c-2.2,0-4,1.8-4,4v24c0,2.2,1.8,4,4,4h31c1.7,0,3-1.3,3-3V16C42,13.8,40.2,12,38,12z"
-        ></path>
-        <path
-          fill="#FFCA28"
-          d="M42.2,18H15.3c-1.9,0-3.6,1.4-3.9,3.3L8,40h31.7c1.9,0,3.6-1.4,3.9-3.3l2.5-14C46.6,20.3,44.7,18,42.2,18z"
-        ></path>
-      </svg>
-
-      <div className="flex flex-1 items-center gap-2">
-        <div className="flex flex-1 items-center gap-2">
-          <h3 className="line-clamp-1 text-sm font-semibold capitalize">
-            {data.title}
-          </h3>
-          {data.isFavorite && (
-            <Star className="h-3 w-3 fill-yellow-400 text-yellow-400" />
+          {!isRootFolder && (
+            <DropdownMenu modal={false}>
+              <DropdownMenuTrigger asChild>
+                <Button variant="ghost" className="h-8 w-8 p-0">
+                  <MoreVertical className="h-4 w-4" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" onInteractOutside={(e) => {
+                if (isSyncing) {
+                  e.preventDefault();
+                }
+              }}>
+                <DropdownMenuItem onClick={handleFavorite}>
+                  <Star className={cn("mr-2 h-4 w-4", data.isFavorite && "text-yellow-500")} />
+                  {data.isFavorite ? "Remove from Favorites" : "Add to Favorites"}
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => setShowRenameDialog(true)}>
+                  <Pencil className="mr-2 h-4 w-4" />
+                  Rename
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => setShowMoveDialog(true)}>
+                  <Move className="mr-2 h-4 w-4" />
+                  Move
+                </DropdownMenuItem>
+                <DropdownMenuItem 
+                  onClick={handleSyncClick}
+                  disabled={isSyncing}
+                >
+                  {isSyncing ? (
+                    <>
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      Syncing...
+                    </>
+                  ) : (
+                    <>
+                      <RefreshCw className="mr-2 h-4 w-4" />
+                      Sync
+                    </>
+                  )}
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => setShowShareDialog(true)}>
+                  <Share2 className="mr-2 h-4 w-4" />
+                  Share
+                </DropdownMenuItem>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem
+                  onClick={() => setShowDeleteDialog(true)}
+                  className="text-destructive focus:text-destructive"
+                >
+                  <Trash2 className="mr-2 h-4 w-4" />
+                  Delete
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
           )}
         </div>
-        {!data.isRoot && (canEdit || canDelete) && (
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button
-                size={"icon"}
-                variant={"ghost"}
-                disabled={isPending}
-                className="size-5 shrink-0 rounded-full"
-              >
-                {isPending ? (
-                  <Loader2 className="h-3 w-3 animate-spin" />
-                ) : (
-                  <EllipsisVertical className="h-3 w-3" />
-                )}
-              </Button>
-            </DropdownMenuTrigger>
-
-            <DropdownMenuContent
-              align="start"
-              className="w-48"
-              onClick={(e) => e.stopPropagation()}
-            >
-              {canEdit && (
-                <>
-                  <DropdownMenuItem
-                    onSelect={(e) => e.preventDefault()}
-                    className="flex items-center gap-2"
-                  >
-                    <Edit className="h-4 w-4" />
-                    <span>Rename</span>
-                  </DropdownMenuItem>
-                  <DropdownMenuItem
-                    onSelect={(e) => e.preventDefault()}
-                    className="flex items-center gap-2"
-                  >
-                    <Move className="h-4 w-4" />
-                    <span>Move</span>
-                  </DropdownMenuItem>
-                </>
-              )}
-              <DropdownMenuItem
-                onSelect={() => startTransition(async () => {
-                  const result = await toggleFolderFavorite(data.id);
-                  if (result.success) {
-                    toast({
-                      title: "Success",
-                      description: result.message,
-                    });
-                    await queryClient.invalidateQueries({ queryKey: ["folders"] });
-                  } else {
-                    toast({
-                      title: "Error",
-                      description: result.message,
-                      variant: "destructive",
-                    });
-                  }
-                })}
-                className="flex items-center gap-2"
-              >
-                <Star className="h-4 w-4" />
-                <span>{data.isFavorite ? "Remove from favorites" : "Add to favorites"}</span>
-              </DropdownMenuItem>
-              {canDelete && (
-                <DropdownMenuItem
-                  onSelect={(e) => {
-                    e.preventDefault();
-                    setShowDeleteDialog(true);
-                  }}
-                  className="flex items-center gap-2 text-destructive"
-                >
-                  <Trash className="h-4 w-4" />
-                  <span>Delete</span>
-                </DropdownMenuItem>
-              )}
-            </DropdownMenuContent>
-          </DropdownMenu>
-        )}
       </div>
+
+      {/* Drag and Drop Visual Feedback */}
+      {isDragging && (
+        <div className="absolute inset-0 flex items-center justify-center bg-primary/10 rounded-lg">
+          <div className="flex items-center gap-2 text-primary font-medium">
+            <Move className="h-4 w-4" />
+            <span>Move to</span>
+          </div>
+        </div>
+      )}
+
+      {isOver && !isDragging && (
+        <div className="absolute inset-0 flex items-center justify-center bg-primary/5 rounded-lg">
+          <div className="flex items-center gap-2 text-primary font-medium">
+            <span>Drop here</span>
+          </div>
+        </div>
+      )}
+
+      {isMoving && (
+        <div className="absolute inset-0 flex items-center justify-center bg-background/80 rounded-lg">
+          <Loader2 className="h-6 w-6 animate-spin text-primary" />
+        </div>
+      )}
 
       <Dialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
         <DialogContent>
@@ -235,6 +334,79 @@ export default function FolderCard({ data, onSelect, isSelected, isSelecting }: 
               ) : (
                 "Delete"
               )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={showRenameDialog} onOpenChange={setShowRenameDialog}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Rename Folder</DialogTitle>
+            <DialogDescription>
+              Enter a new name for this folder.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="py-4">
+            <input
+              type="text"
+              defaultValue={data.title}
+              className="w-full px-3 py-2 border rounded-md"
+              onKeyDown={(e) => {
+                if (e.key === "Enter") {
+                  handleRename(e.currentTarget.value);
+                  setShowRenameDialog(false);
+                }
+              }}
+            />
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowRenameDialog(false)}>
+              Cancel
+            </Button>
+            <Button 
+              onClick={() => {
+                const input = document.querySelector("input") as HTMLInputElement;
+                handleRename(input.value);
+                setShowRenameDialog(false);
+              }}
+            >
+              Rename
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={showMoveDialog} onOpenChange={setShowMoveDialog}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Move Folder</DialogTitle>
+            <DialogDescription>
+              Select a destination folder to move this folder to.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="py-4">
+            <MoveFolderForm id={data.id} onSuccess={() => setShowMoveDialog(false)} />
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={showShareDialog} onOpenChange={setShowShareDialog}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Share Folder</DialogTitle>
+            <DialogDescription>
+              Share this folder with others.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="py-4">
+            <p className="text-sm text-muted-foreground">
+              Sharing functionality coming soon.
+            </p>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowShareDialog(false)}>
+              Close
             </Button>
           </DialogFooter>
         </DialogContent>

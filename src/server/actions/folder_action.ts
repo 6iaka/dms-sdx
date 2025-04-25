@@ -223,27 +223,29 @@ export const moveFolder = async (folderId: number, targetFolderId: number) => {
 
   try {
     if (!user) throw new Error("Not authorized");
-    
-    // Get the source and target folders
-    const sourceFolder = await folderService.findById(folderId);
+
+    // Get the folders from our database
+    const folder = await folderService.findById(folderId);
     const targetFolder = await folderService.findById(targetFolderId);
-    
-    if (!sourceFolder || !targetFolder) {
-      throw new Error("Source or target folder not found");
+
+    if (!folder || !targetFolder) {
+      throw new Error("Folder not found");
     }
 
     // Move the folder in Google Drive
-    await driveService.moveItem(sourceFolder.googleId, targetFolder.googleId);
+    await driveService.moveItem(folder.googleId, targetFolder.googleId);
 
-    // Update the folder's parent in the database
+    // Update the folder in our database
     await folderService.update(folderId, {
-      parent: { connect: { id: targetFolderId } }
+      parent: { connect: { id: targetFolderId } },
     });
 
     revalidatePath("/");
-    revalidatePath("/folder/:id", "page");
+    revalidatePath("/folder/[id]", "page");
+
+    return { success: true, message: "Folder moved successfully" };
   } catch (error) {
-    console.error("Error in moveFolder:", error);
+    console.error("Error moving folder:", error);
     throw error;
   }
 };

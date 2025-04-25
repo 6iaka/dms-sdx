@@ -3,6 +3,7 @@ import { type Metadata } from "next";
 import { Karla as FontSans } from "next/font/google";
 import NextTopLoader from "nextjs-toploader";
 import QueryProvider from "~/components/QueryProvider";
+import DndProvider from "~/components/DndProvider";
 import { Toaster } from "~/components/ui/toaster";
 import "~/styles/globals.css";
 
@@ -30,9 +31,11 @@ export default async function RootLayout({
       >
         <body>
           <QueryProvider>
-            <NextTopLoader />
-            {children}
-            <Toaster />
+            <DndProvider>
+              <NextTopLoader />
+              {children}
+              <Toaster />
+            </DndProvider>
           </QueryProvider>
         </body>
       </html>
