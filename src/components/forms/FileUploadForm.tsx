@@ -100,6 +100,16 @@ const FileUploadForm = ({ folderId }: Props) => {
         formData.append("description", data.description);
       }
 
+      // Add progress tracking
+      const xhr = new XMLHttpRequest();
+      xhr.upload.addEventListener("progress", (event) => {
+        if (event.lengthComputable) {
+          const percentComplete = (event.loaded / event.total) * 100;
+          console.log(`Upload progress: ${percentComplete}%`);
+          // You can update a progress bar here if needed
+        }
+      });
+
       const result = await uploadFile(formData);
       if (result.success) {
         toast({

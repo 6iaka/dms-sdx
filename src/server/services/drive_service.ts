@@ -140,6 +140,7 @@ export class DriveService {
       const buffer = Buffer.from(arrayBuffer);
       const stream = Readable.from(buffer);
 
+      // Configure resumable upload for large files
       const response = await this.drive.files.create({
         requestBody: {
           parents: [folderId],
@@ -156,15 +157,26 @@ export class DriveService {
         fields: "id, name, mimeType, thumbnailLink, webContentLink, webViewLink, iconLink, size, fileExtension, originalFilename",
       });
 
-      await this.drive.permissions.create({
+      // Wait for the upload to complete
+      await new Promise((resolve, reject) => {
+        stream.on('end', resolve);
+        stream.on('error', reject);
+      });
+
+      const fileData = await this.drive.files.get({
         fileId: response.data.id!,
+        fields: "id, name, mimeType, thumbnailLink, webContentLink, webViewLink, iconLink, size, fileExtension, originalFilename",
+      });
+
+      await this.drive.permissions.create({
+        fileId: fileData.data.id!,
         requestBody: {
           role: "reader",
           type: "anyone",
         },
       });
 
-      return response.data;
+      return fileData.data;
     } catch (error) {
       console.error(error);
       throw new Error((error as Error).message);
