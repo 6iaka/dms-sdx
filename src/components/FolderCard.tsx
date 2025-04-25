@@ -44,6 +44,11 @@ import {
   DropdownMenuSeparator,
 } from "./ui/dropdown-menu";
 
+type DragItem = {
+  id: number;
+  type: typeof ItemTypes[keyof typeof ItemTypes];
+};
+
 type Props = {
   data: Folder & {
     files: File[];
@@ -75,24 +80,22 @@ export default function FolderCard({ data, onSelect, isSelected, isSelecting }: 
   const handleDelete = async () => {
     if (!canDelete) return;
     try {
-      startTransition(async () => {
-        const result = await deleteFolder(data.id);
-        if (result.success) {
-          toast({
-            title: "Success",
-            description: "Folder deleted successfully",
-          });
-          await queryClient.invalidateQueries({ queryKey: ["folders"] });
-          await queryClient.invalidateQueries({ queryKey: ["files"] });
-        } else {
-          toast({
-            title: "Error",
-            description: result.error || "Failed to delete folder",
-            variant: "destructive",
-          });
-        }
-        setShowDeleteDialog(false);
-      });
+      const result = await deleteFolder(data.id);
+      if (result.success) {
+        toast({
+          title: "Success",
+          description: "Folder deleted successfully",
+        });
+        await queryClient.invalidateQueries({ queryKey: ["folders"] });
+        await queryClient.invalidateQueries({ queryKey: ["files"] });
+      } else {
+        toast({
+          title: "Error",
+          description: result.error || "Failed to delete folder",
+          variant: "destructive",
+        });
+      }
+      setShowDeleteDialog(false);
     } catch (error) {
       console.error("Failed to delete folder:", error);
       toast({
@@ -207,6 +210,22 @@ export default function FolderCard({ data, onSelect, isSelected, isSelecting }: 
     void handleSync();
   };
 
+  const handleRenameClick = async () => {
+    try {
+      await handleRename();
+    } catch (error) {
+      console.error("Failed to rename folder:", error);
+    }
+  };
+
+  const handleDeleteClick = async () => {
+    try {
+      await handleDelete();
+    } catch (error) {
+      console.error("Failed to delete folder:", error);
+    }
+  };
+
   const handleMove = async (targetFolderId: number) => {
     try {
       await moveFolder(data.id, targetFolderId);
@@ -240,6 +259,14 @@ export default function FolderCard({ data, onSelect, isSelected, isSelecting }: 
     }
   };
 
+  const handleMoveToRootClick = async () => {
+    try {
+      await handleMoveToRoot();
+    } catch (error) {
+      console.error("Failed to move to root:", error);
+    }
+  };
+
   const handleToggleFavorite = async () => {
     try {
       await toggleFolderFavorite(data.id);
@@ -253,6 +280,40 @@ export default function FolderCard({ data, onSelect, isSelected, isSelecting }: 
         description: "Failed to update folder favorite status",
         variant: "destructive",
       });
+    }
+  };
+
+  const handleToggleFavoriteClick = async () => {
+    try {
+      await handleToggleFavorite();
+    } catch (error) {
+      console.error("Failed to toggle favorite:", error);
+    }
+  };
+
+  const handleDrop = async (item: DragItem) => {
+    if (item.type === "folder" && item.id !== data.id) {
+      try {
+        await moveFolder(item.id, data.id);
+        toast({
+          title: "Success",
+          description: "Folder moved successfully",
+        });
+      } catch (error) {
+        toast({
+          title: "Error",
+          description: "Failed to move folder",
+          variant: "destructive",
+        });
+      }
+    }
+  };
+
+  const handleMoveClick = async (targetFolderId: number) => {
+    try {
+      await handleMove(targetFolderId);
+    } catch (error) {
+      console.error("Failed to move folder:", error);
     }
   };
 
@@ -379,7 +440,7 @@ export default function FolderCard({ data, onSelect, isSelected, isSelecting }: 
             </Button>
             <Button 
               variant="destructive" 
-              onClick={() => startTransition(handleDelete)}
+              onClick={() => startTransition(() => handleDeleteClick())}
               disabled={isPending}
             >
               {isPending ? (
@@ -410,7 +471,7 @@ export default function FolderCard({ data, onSelect, isSelected, isSelecting }: 
               className="w-full px-3 py-2 border rounded-md"
               onKeyDown={(e) => {
                 if (e.key === "Enter") {
-                  handleRename();
+                  handleRenameClick();
                   setShowRenameDialog(false);
                 }
               }}
@@ -424,7 +485,7 @@ export default function FolderCard({ data, onSelect, isSelected, isSelecting }: 
               onClick={() => {
                 const input = document.querySelector("input") as HTMLInputElement;
                 setNewName(input.value);
-                handleRename();
+                void handleRenameClick();
               }}
             >
               Rename
