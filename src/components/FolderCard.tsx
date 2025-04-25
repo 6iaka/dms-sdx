@@ -68,6 +68,7 @@ export default function FolderCard({ data, onSelect, isSelected, isSelecting }: 
   const { canEdit, canDelete } = usePermissions();
   const [isMoving, setIsMoving] = useState(false);
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
+  const [newName, setNewName] = useState("");
 
   const isRootFolder = data.parentId === null;
 
@@ -153,14 +154,18 @@ export default function FolderCard({ data, onSelect, isSelected, isSelecting }: 
     }),
   }));
 
-  const handleRename = async (newTitle: string) => {
+  const handleRename = async () => {
     try {
-      await editFolder({ id: data.id, title: newTitle });
+      await editFolder({
+        id: data.id,
+        title: newName,
+      });
       toast({
         title: "Success",
         description: "Folder renamed successfully",
       });
-      await queryClient.invalidateQueries({ queryKey: ["folders"] });
+      setShowRenameDialog(false);
+      setNewName("");
     } catch (error) {
       toast({
         title: "Error",
@@ -176,7 +181,9 @@ export default function FolderCard({ data, onSelect, isSelected, isSelecting }: 
       const response = await fetch(`/api/folder/${data.id}/sync`, {
         method: "POST",
       });
-      if (!response.ok) throw new Error("Sync failed");
+      if (!response.ok) {
+        throw new Error("Failed to sync folder");
+      }
       toast({
         title: "Success",
         description: "Folder synced successfully",
@@ -198,6 +205,55 @@ export default function FolderCard({ data, onSelect, isSelected, isSelecting }: 
     e.preventDefault();
     e.stopPropagation();
     void handleSync();
+  };
+
+  const handleMove = async (targetFolderId: number) => {
+    try {
+      await moveFolder(data.id, targetFolderId);
+      toast({
+        title: "Success",
+        description: "Folder moved successfully",
+      });
+      setShowMoveDialog(false);
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Failed to move folder",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const handleMoveToRoot = async () => {
+    try {
+      await moveFolder(data.id, 0);
+      toast({
+        title: "Success",
+        description: "Folder moved to root successfully",
+      });
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Failed to move folder to root",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const handleToggleFavorite = async () => {
+    try {
+      await toggleFolderFavorite(data.id);
+      toast({
+        title: "Success",
+        description: `Folder ${data.isFavorite ? "removed from" : "added to"} favorites`,
+      });
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Failed to update folder favorite status",
+        variant: "destructive",
+      });
+    }
   };
 
   return (
@@ -354,7 +410,7 @@ export default function FolderCard({ data, onSelect, isSelected, isSelecting }: 
               className="w-full px-3 py-2 border rounded-md"
               onKeyDown={(e) => {
                 if (e.key === "Enter") {
-                  handleRename(e.currentTarget.value);
+                  handleRename();
                   setShowRenameDialog(false);
                 }
               }}
@@ -367,8 +423,8 @@ export default function FolderCard({ data, onSelect, isSelected, isSelecting }: 
             <Button 
               onClick={() => {
                 const input = document.querySelector("input") as HTMLInputElement;
-                handleRename(input.value);
-                setShowRenameDialog(false);
+                setNewName(input.value);
+                handleRename();
               }}
             >
               Rename
