@@ -34,6 +34,7 @@ import { Textarea } from "~/components/ui/textarea";
 import { useToast } from "~/hooks/use-toast";
 import { uploadFile } from "~/server/actions/file_action";
 import { getAllTags } from "~/server/actions/tag_action";
+import { Progress } from "~/components/ui/progress";
 
 const formSchema = z.object({
   file: z.instanceof(File).nullable(),
@@ -49,6 +50,7 @@ const FileUploadForm = ({ folderId }: Props) => {
   const queryClient = useQueryClient();
   const [selectedTags, setSelectedTags] = useState<string[]>([]);
   const [isLoading, setIsLoading] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState(0);
 
   const { data: tags } = useQuery({
     queryKey: ["tags"],
@@ -86,6 +88,7 @@ const FileUploadForm = ({ folderId }: Props) => {
   const onSubmit = async (data: z.infer<typeof formSchema>) => {
     try {
       setIsLoading(true);
+      setUploadProgress(0);
       const formData = new FormData();
       if (data.file) {
         formData.append("file", data.file);
@@ -105,8 +108,8 @@ const FileUploadForm = ({ folderId }: Props) => {
       xhr.upload.addEventListener("progress", (event) => {
         if (event.lengthComputable) {
           const percentComplete = (event.loaded / event.total) * 100;
+          setUploadProgress(Math.round(percentComplete));
           console.log(`Upload progress: ${percentComplete}%`);
-          // You can update a progress bar here if needed
         }
       });
 
@@ -121,6 +124,7 @@ const FileUploadForm = ({ folderId }: Props) => {
         // Reset form
         form.reset();
         setSelectedTags([]);
+        setUploadProgress(0);
         // Close dialog
         setIsOpen(false);
       } else {
@@ -140,6 +144,7 @@ const FileUploadForm = ({ folderId }: Props) => {
       });
     } finally {
       setIsLoading(false);
+      setUploadProgress(0);
     }
   };
 
@@ -195,9 +200,11 @@ const FileUploadForm = ({ folderId }: Props) => {
                       }}
                     >
                       {isLoading ? (
-                        <div className="flex items-center gap-2">
+                        <div className="flex flex-col items-center gap-2">
                           <Loader2 className="size-8 animate-spin text-muted-foreground" />
-                          <p className="text-sm text-muted-foreground">Downloading file...</p>
+                          <p className="text-sm text-muted-foreground">Uploading file...</p>
+                          <Progress value={uploadProgress} className="w-full" />
+                          <p className="text-xs text-muted-foreground">{uploadProgress}%</p>
                         </div>
                       ) : (
                         <>
@@ -286,11 +293,15 @@ const FileUploadForm = ({ folderId }: Props) => {
               )}
             />
 
-            <Button type="submit" disabled={form.formState.isSubmitting}>
-              {form.formState.isSubmitting && (
-                <Loader2 className="animate-spin" />
+            <Button type="submit" disabled={form.formState.isSubmitting || isLoading}>
+              {form.formState.isSubmitting || isLoading ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  {uploadProgress > 0 ? `Uploading... ${uploadProgress}%` : "Uploading..."}
+                </>
+              ) : (
+                "Upload"
               )}
-              Upload
             </Button>
           </form>
         </Form>
