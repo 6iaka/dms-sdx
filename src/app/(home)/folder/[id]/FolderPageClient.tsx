@@ -1,7 +1,8 @@
 "use client";
 import { ChevronLeft, Trash, X, Loader2 } from "lucide-react";
 import Link from "next/link";
-import { useState, useEffect, startTransition, useTransition } from "react";
+import { useState, useEffect, startTransition, useTransition, useMemo, useCallback } from "react";
+import { useRouter } from "next/navigation";
 import type { File, Folder, Tag } from "@prisma/client";
 import DropzoneProvider from "~/components/DropzoneProvider";
 import FileCard from "~/components/FileCard";
@@ -53,16 +54,212 @@ const FolderPageClient = ({ data }: { data: FolderWithChildren }) => {
   const [folder, setFolder] = useState<FolderWithChildren>(data);
   const [files, setFiles] = useState<(File & { tags: Tag[] })[]>(data.files || []);
   const [isPending, startTransition] = useTransition();
+  const router = useRouter();
 
   const { data: tags } = useQuery({
     queryKey: ["tags"],
     queryFn: async () => await getAllTags(),
+    staleTime: 5 * 60 * 1000, // 5 minutes
+    gcTime: 30 * 60 * 1000, // 30 minutes
   });
 
   const { data: filesData, isLoading: isLoadingFiles } = useQuery({
     queryKey: ["files", data.id],
     queryFn: () => getFiles(data.id),
+    staleTime: 1 * 60 * 1000, // 1 minute
+    gcTime: 5 * 60 * 1000, // 5 minutes
   });
+
+  // Memoize expensive computations
+  const selectedFiles = useMemo(() => 
+    selectedItems.filter(id => data.files.some(file => file.id === id)),
+    [selectedItems, data.files]
+  );
+
+  const selectedFolders = useMemo(() => 
+    selectedItems.filter(id => data.children.some(child => child.id === id)),
+    [selectedItems, data.children]
+  );
+
+  // Optimize handlers with useCallback
+  const handleSelectAll = useCallback(() => {
+    const hasSelectedItems = selectedItems.length > 0;
+    if (!hasSelectedItems) {
+      const allFileIds = data.files.map(file => file.id);
+      const allFolderIds = data.children.map(child => child.id);
+      setSelectedItems([...allFileIds, ...allFolderIds]);
+    } else {
+      setSelectedItems([]);
+    }
+  }, [selectedItems, data.files, data.children]);
+
+  const handleFolderSelect = useCallback((folderId: number, selected: boolean): void => {
+    if (selected) {
+      setSelectedItems(prev => [...prev, folderId]);
+    } else {
+      setSelectedItems(prev => prev.filter(id => id !== folderId));
+    }
+  }, []);
+
+  // Optimize bulk operations
+  const handleDelete = useCallback(async () => {
+    try {
+      startTransition(async () => {
+        // Delete selected files in bulk
+        if (selectedFiles.length > 0) {
+          await deleteFiles(selectedFiles);
+        }
+
+        // Delete selected folders in parallel
+        if (selectedFolders.length > 0) {
+          await Promise.all(selectedFolders.map(folderId => deleteFolder(folderId)));
+        }
+
+        toast({
+          title: "Success",
+          description: "Items deleted successfully",
+        });
+        setShowDeleteDialog(false);
+        setSelectedItems([]);
+        setIsSelecting(false);
+        
+        // Invalidate queries in parallel
+        await Promise.all([
+          queryClient.invalidateQueries({ queryKey: ["files"] }),
+          queryClient.invalidateQueries({ queryKey: ["folders"] }),
+          queryClient.invalidateQueries({ queryKey: ["tags"] })
+        ]);
+      });
+    } catch (error) {
+      console.error("Failed to delete items:", error);
+      toast({
+        title: "Error",
+        description: "Failed to delete items",
+        variant: "destructive",
+      });
+    }
+  }, [selectedFiles, selectedFolders, queryClient]);
+
+  // Optimize tag assignment
+  const handleAssignTag = useCallback(async () => {
+    if (selectedTags.length === 0) return;
+    
+    try {
+      await assignTagToFiles({
+        fileIds: selectedItems,
+        tagNames: selectedTags,
+      });
+      toast({
+        title: "Success",
+        description: "Tags assigned successfully",
+      });
+      setShowTagDialog(false);
+      setSelectedTags([]);
+      setSelectedItems([]);
+      setIsSelecting(false);
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ["files"] }),
+        queryClient.invalidateQueries({ queryKey: ["tags"] })
+      ]);
+    } catch (error) {
+      console.error("Error assigning tags:", error);
+      toast({
+        title: "Error",
+        description: "Failed to assign tags",
+        variant: "destructive",
+      });
+    }
+  }, [selectedTags, selectedItems, queryClient]);
+
+  // Optimize move operation
+  const handleMove = useCallback(async () => {
+    if (!targetFolderId) return;
+    
+    try {
+      // Move selected files in parallel
+      if (selectedFiles.length > 0) {
+        await moveFiles({
+          fileIds: selectedFiles,
+          targetFolderId,
+        });
+      }
+      
+      // Move selected folders in parallel
+      if (selectedFolders.length > 0) {
+        await Promise.all(selectedFolders.map(folderId => 
+          moveFolder(folderId, targetFolderId)
+        ));
+      }
+      
+      toast({
+        title: "Success",
+        description: "Items moved successfully",
+      });
+      setShowMoveDialog(false);
+      setTargetFolderId(null);
+      setSelectedItems([]);
+      setIsSelecting(false);
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ["files"] }),
+        queryClient.invalidateQueries({ queryKey: ["folders"] })
+      ]);
+    } catch (error) {
+      console.error("Failed to move items:", error);
+      toast({
+        title: "Error",
+        description: "Failed to move items",
+        variant: "destructive",
+      });
+    }
+  }, [selectedFiles, selectedFolders, targetFolderId, queryClient]);
+
+  // Memoize dialog content
+  const deleteDialogContent = useMemo(() => (
+    <DialogContent>
+      <DialogHeader>
+        <DialogTitle>Delete Items</DialogTitle>
+        <DialogDescription>
+          Are you sure you want to delete {selectedItems.length} item{selectedItems.length !== 1 ? "s" : ""}? This action cannot be undone.
+        </DialogDescription>
+      </DialogHeader>
+      <DialogFooter>
+        <Button variant="outline" onClick={() => setShowDeleteDialog(false)}>
+          Cancel
+        </Button>
+        <Button 
+          variant="destructive" 
+          onClick={handleDelete}
+          disabled={isPending}
+        >
+          {isPending ? (
+            <>
+              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+              Deleting...
+            </>
+          ) : (
+            "Delete"
+          )}
+        </Button>
+      </DialogFooter>
+    </DialogContent>
+  ), [selectedItems.length, isPending, handleDelete]);
+
+  // Update existing tags when files are selected
+  useEffect(() => {
+    if (selectedItems.length > 0) {
+      const tags = new Set<string>();
+      files
+        .filter(file => selectedItems.includes(file.id))
+        .forEach(file => {
+          if (file.tags) {
+            file.tags.forEach(tag => tags.add(tag.name));
+          }
+        });
+      setSelectedTags(Array.from(tags));
+    } else {
+      setSelectedTags([]);
+    }
+  }, [selectedItems, files]);
 
   // Fetch root folder
   useEffect(() => {
@@ -95,168 +292,18 @@ const FolderPageClient = ({ data }: { data: FolderWithChildren }) => {
     void loadDataAsync();
   }, [data.id]);
 
-  const handleSelectAll = () => {
-    const hasSelectedItems = selectedItems.length > 0;
-    if (!hasSelectedItems) {
-      const allFileIds = files.map(file => file.id);
-      const allFolderIds = folder.children.map(child => child.id);
-      setSelectedItems([...allFileIds, ...allFolderIds]);
-    } else {
-      setSelectedItems([]);
-    }
-  };
-
-  const handleFolderSelect = (folderId: number, selected: boolean): void => {
-    if (selected) {
-      setSelectedItems(prev => [...prev, folderId]);
-    } else {
-      setSelectedItems(prev => prev.filter(id => id !== folderId));
-    }
-  };
-
-  const handleDelete = async () => {
-    try {
-      startTransition(async () => {
-        // Separate files and folders from selected items
-        const selectedFiles = selectedItems.filter(id => 
-          files.some(file => file.id === id)
-        );
-        const selectedFolders = selectedItems.filter(id => 
-          folder.children.some(child => child.id === id)
-        );
-
-        // Delete selected files in bulk
-        if (selectedFiles.length > 0) {
-          await deleteFiles(selectedFiles);
-        }
-
-        // Delete selected folders
-        for (const folderId of selectedFolders) {
-          await deleteFolder(folderId);
-        }
-
-        toast({
-          title: "Success",
-          description: "Items deleted successfully",
-        });
-        setShowDeleteDialog(false);
-        setSelectedItems([]);
-        setIsSelecting(false);
-        // Invalidate queries to refresh the data
-        await queryClient.invalidateQueries({ queryKey: ["files"] });
-        await queryClient.invalidateQueries({ queryKey: ["folders"] });
-        await queryClient.invalidateQueries({ queryKey: ["tags"] });
-      });
-    } catch (error) {
-      console.error("Failed to delete items:", error);
-      toast({
-        title: "Error",
-        description: "Failed to delete items",
-        variant: "destructive",
-      });
-    }
-  };
-
-  const handleAssignTag = async () => {
-    if (selectedTags.length === 0) return;
-    
-    try {
-      await assignTagToFiles({
-        fileIds: selectedItems,
-        tagNames: selectedTags,
-      });
-      toast({
-        title: "Success",
-        description: "Tags assigned successfully",
-      });
-      setShowTagDialog(false);
-      setSelectedTags([]);
-      setSelectedItems([]);
-      setIsSelecting(false);
-      await queryClient.invalidateQueries({ queryKey: ["files"] });
-      await queryClient.invalidateQueries({ queryKey: ["tags"] });
-    } catch (error) {
-      console.error("Error assigning tags:", error);
-      toast({
-        title: "Error",
-        description: "Failed to assign tags",
-        variant: "destructive",
-      });
-    }
-  };
-
-  const handleMove = async () => {
-    if (!targetFolderId) return;
-    
-    try {
-      // Move selected files
-      if (selectedItems.length > 0) {
-        await moveFiles({
-          fileIds: selectedItems,
-          targetFolderId,
-        });
-      }
-      // Move selected folders
-      if (selectedItems.length > 0 && selectedItems.every(id => typeof id === 'number')) {
-        for (const folderId of selectedItems.filter(id => typeof id === 'number')) {
-          await moveFolder(folderId, targetFolderId);
-        }
-      }
-      toast({
-        title: "Success",
-        description: "Items moved successfully",
-      });
-      setShowMoveDialog(false);
-      setTargetFolderId(null);
-      setSelectedItems([]);
-      setIsSelecting(false);
-      await queryClient.invalidateQueries({ queryKey: ["files"] });
-      await queryClient.invalidateQueries({ queryKey: ["folders"] });
-    } catch {
-      toast({
-        title: "Error",
-        description: "Failed to move items",
-        variant: "destructive",
-      });
-    }
-  };
-
-  // Update existing tags when files are selected
-  useEffect(() => {
-    if (selectedItems.length > 0) {
-      const tags = new Set<string>();
-      files
-        .filter(file => selectedItems.includes(file.id))
-        .forEach(file => {
-          if (file.tags) {
-            file.tags.forEach(tag => tags.add(tag.name));
-          }
-        });
-      setSelectedTags(Array.from(tags));
-    } else {
-      setSelectedTags([]);
-    }
-  }, [selectedItems, files]);
-
   return (
     <>
       <header className="flex flex-col gap-2 p-4 pb-0">
         <div className="flex flex-1 items-start justify-between gap-2">
-          {data.parentId ? (
-            <Button variant={"secondary"} className="rounded-full" asChild>
-              <Link href={`/folder/${data.parentId}`}>
-                <ChevronLeft />
-                Back
-              </Link>
-            </Button>
-          ) : (
-            <Button variant={"secondary"} className="rounded-full" asChild>
-              <Link href={"/"}>
-                <ChevronLeft />
-                Dashboard
-              </Link>
-            </Button>
-          )}
+          <Button 
+            variant={"secondary"} 
+            className="rounded-full" 
+            onClick={() => router.back()}
+          >
+            <ChevronLeft />
+            Back
+          </Button>
 
           {!isViewer && (
             <div className="flex flex-wrap items-center gap-2">
@@ -348,33 +395,7 @@ const FolderPageClient = ({ data }: { data: FolderWithChildren }) => {
       </DropzoneProvider>
 
       <Dialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Delete Items</DialogTitle>
-            <DialogDescription>
-              Are you sure you want to delete {selectedItems.length} item{selectedItems.length !== 1 ? "s" : ""}? This action cannot be undone.
-            </DialogDescription>
-          </DialogHeader>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setShowDeleteDialog(false)}>
-              Cancel
-            </Button>
-            <Button 
-              variant="destructive" 
-              onClick={handleDelete}
-              disabled={isPending}
-            >
-              {isPending ? (
-                <>
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  Deleting...
-                </>
-              ) : (
-                "Delete"
-              )}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
+        {deleteDialogContent}
       </Dialog>
 
       <Dialog open={showTagDialog} onOpenChange={setShowTagDialog}>
