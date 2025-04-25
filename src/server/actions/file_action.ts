@@ -186,17 +186,37 @@ export const deleteFiles = async (ids: number[]) => {
 
   try {
     if (!user) throw new Error("Not authorized");
-    const deletePromise = ids.map(async (id) => {
-      return await deleteFile(id);
+    
+    // Get all files first to ensure they exist and get their Google IDs
+    const files = await fileService.findByIds(ids);
+    if (!files || files.length === 0) throw new Error("No files found to delete");
+
+    // Delete from Google Drive first
+    const driveDeletions = files.map(async (file: { id: number; googleId: string | null }) => {
+      if (file.googleId) {
+        try {
+          await driveService.deleteItem(file.googleId);
+        } catch (error) {
+          console.error(`Error deleting file ${file.id} from Google Drive:`, error);
+          // Continue with database deletion even if Google Drive deletion fails
+        }
+      }
     });
-    const deleted = await Promise.allSettled(deletePromise);
+    await Promise.allSettled(driveDeletions);
+
+    // Then delete from our database
+    const deletedFiles = await fileService.deleteMany(ids);
+    if (!deletedFiles || deletedFiles.count === 0) {
+      throw new Error("Failed to delete files from database");
+    }
 
     revalidatePath("/");
     revalidatePath("/folder/:id", "page");
 
-    return deleted;
+    return { success: true, count: deletedFiles.count };
   } catch (error) {
-    console.error((error as Error).message);
+    console.error("Error in deleteFiles:", error);
+    throw new Error(error instanceof Error ? error.message : "Failed to delete files");
   }
 };
 

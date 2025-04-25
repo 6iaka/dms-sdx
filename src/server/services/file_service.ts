@@ -266,6 +266,38 @@ export class FileService {
       throw new Error((error as Error).message);
     }
   };
+
+  /**
+   * Find files by their IDs
+   * @param ids Array of file IDs to find
+   * @returns Array of files
+   */
+  findByIds = async (ids: number[]) => {
+    try {
+      const files = await prisma.file.findMany({
+        where: { id: { in: ids } },
+      });
+      return files;
+    } catch (error) {
+      throw new Error((error as Error).message);
+    }
+  };
+
+  /**
+   * Delete multiple files from the database
+   * @param ids Array of file IDs to delete
+   * @returns Count of deleted files
+   */
+  deleteMany = async (ids: number[]) => {
+    try {
+      const deleted = await prisma.file.deleteMany({
+        where: { id: { in: ids } },
+      });
+      return deleted;
+    } catch (error) {
+      throw new Error((error as Error).message);
+    }
+  };
 }
 
 const fileService = new FileService();
