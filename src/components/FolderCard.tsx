@@ -471,7 +471,7 @@ export default function FolderCard({ data, onSelect, isSelected, isSelecting }: 
               className="w-full px-3 py-2 border rounded-md"
               onKeyDown={(e) => {
                 if (e.key === "Enter") {
-                  handleRenameClick();
+                  void handleRenameClick();
                   setShowRenameDialog(false);
                 }
               }}
@@ -483,7 +483,7 @@ export default function FolderCard({ data, onSelect, isSelected, isSelecting }: 
             </Button>
             <Button 
               onClick={() => {
-                const input = document.querySelector("input") as HTMLInputElement;
+                const input = document.querySelector("input")!;
                 setNewName(input.value);
                 void handleRenameClick();
               }}
