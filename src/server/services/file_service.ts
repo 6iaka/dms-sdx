@@ -148,13 +148,14 @@ export class FileService {
       const files = await prisma.file.findMany({
         where: {
           AND: [
-            {
+            // Only apply text search if query is not empty
+            query ? {
               OR: [
                 { title: { contains: query, mode: "insensitive" } },
                 { originalFilename: { contains: query, mode: "insensitive" } },
                 { description: { contains: query, mode: "insensitive" } },
               ],
-            },
+            } : {},
             category ? { categeory: category } : {},
             tags && tags.length > 0
               ? {
@@ -168,7 +169,6 @@ export class FileService {
           ],
         },
         orderBy: { updatedAt: "desc" },
-        take: 40,
         include: { tags: true },
       });
       return files;
