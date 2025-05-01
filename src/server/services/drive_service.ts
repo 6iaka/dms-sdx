@@ -167,6 +167,8 @@ export class DriveService {
         fields: "id, name, mimeType, thumbnailLink, webContentLink, webViewLink, iconLink, size, fileExtension, originalFilename",
       });
 
+      console.log("File metadata created, starting upload...");
+
       // Wait for the upload to complete
       await new Promise((resolve, reject) => {
         let uploadedBytes = 0;

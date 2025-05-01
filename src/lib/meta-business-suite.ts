@@ -11,14 +11,14 @@ interface PostStats {
   clicks: number;
 }
 
-interface PageInfo {
+export interface PageInfo {
   id: string;
   name: string;
   access_token: string;
   tasks: string[];
 }
 
-interface Post {
+export interface Post {
   id: string;
   message?: string;
   created_time: string;
@@ -43,10 +43,10 @@ export class MetaBusinessSuiteService {
           fields: 'id,name,access_token,tasks',
         },
       });
-      return response.data.data;
+      return response.data.data || [];
     } catch (error) {
       console.error('Error fetching pages:', error);
-      throw error;
+      return [];
     }
   }
 

@@ -1,16 +1,16 @@
 import React, { useEffect, useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
 import { PostStats } from './PostStats';
-import { MetaBusinessSuiteService } from '../lib/meta-business-suite';
+import { MetaBusinessSuiteService, PageInfo, Post } from '../lib/meta-business-suite';
 
 interface PageDashboardProps {
   accessToken: string;
 }
 
 export function PageDashboard({ accessToken }: PageDashboardProps) {
-  const [pages, setPages] = useState<any[]>([]);
+  const [pages, setPages] = useState<PageInfo[]>([]);
   const [selectedPage, setSelectedPage] = useState<string | null>(null);
-  const [posts, setPosts] = useState<any[]>([]);
+  const [posts, setPosts] = useState<Post[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -18,7 +18,7 @@ export function PageDashboard({ accessToken }: PageDashboardProps) {
     
     const fetchData = async () => {
       try {
-        const pagesData = await metaService.getPages();
+        const pagesData = (await metaService.getPages()) as unknown as PageInfo[];
         setPages(pagesData);
         if (pagesData.length > 0) {
           setSelectedPage(pagesData[0].id);
@@ -75,7 +75,7 @@ export function PageDashboard({ accessToken }: PageDashboardProps) {
                 </CardHeader>
                 <CardContent>
                   <p className="text-sm text-muted-foreground">
-                    Tasks: {page.tasks.join(', ')}
+                    Tasks: {page.tasks?.join(', ') || 'No tasks'}
                   </p>
                 </CardContent>
               </Card>
