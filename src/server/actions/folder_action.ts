@@ -223,11 +223,11 @@ export const moveFolder = async (folderId: number, targetFolderId: number) => {
 
   try {
     if (!user) throw new Error("Not authorized");
-
+    
     // Get the folders from our database
     const folder = await folderService.findById(folderId);
     const targetFolder = await folderService.findById(targetFolderId);
-
+    
     if (!folder || !targetFolder) {
       throw new Error("Folder not found");
     }

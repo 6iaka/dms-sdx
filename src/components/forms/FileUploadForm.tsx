@@ -2,7 +2,7 @@
 
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { FileCheck, Loader2 } from "lucide-react";
+import { FileCheck, Loader2, Cloud, HardDrive, RefreshCw } from "lucide-react";
 import { useState } from "react";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
@@ -35,6 +35,7 @@ import { useToast } from "~/hooks/use-toast";
 import { uploadFile } from "~/server/actions/file_action";
 import { getAllTags } from "~/server/actions/tag_action";
 import { Progress } from "~/components/ui/progress";
+import { useRouter } from "next/navigation";
 
 const formSchema = z.object({
   file: z.instanceof(File).nullable(),
@@ -44,6 +45,19 @@ const formSchema = z.object({
 
 type Props = { folderId?: number };
 
+type UploadResponse = {
+  success: boolean;
+  error?: string;
+  data?: {
+    id: number;
+    title: string;
+    driveStatus: 'uploaded' | 'failed';
+    localStatus: 'uploaded' | 'failed';
+  };
+  driveStatus?: 'uploaded' | 'failed';
+  localStatus?: 'uploaded' | 'failed';
+};
+
 const FileUploadForm = ({ folderId }: Props) => {
   const { toast } = useToast();
   const [isOpen, setIsOpen] = useState(false);
@@ -51,6 +65,10 @@ const FileUploadForm = ({ folderId }: Props) => {
   const [selectedTags, setSelectedTags] = useState<string[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [uploadProgress, setUploadProgress] = useState(0);
+  const [driveStatus, setDriveStatus] = useState<'idle' | 'uploading' | 'uploaded' | 'failed'>('idle');
+  const [localStatus, setLocalStatus] = useState<'idle' | 'uploading' | 'uploaded' | 'failed'>('idle');
+  const [syncStatus, setSyncStatus] = useState<'idle' | 'syncing' | 'synced' | 'failed'>('idle');
+  const router = useRouter();
 
   const { data: tags } = useQuery({
     queryKey: ["tags"],
@@ -89,6 +107,10 @@ const FileUploadForm = ({ folderId }: Props) => {
     try {
       setIsLoading(true);
       setUploadProgress(0);
+      setDriveStatus('uploading');
+      setLocalStatus('uploading');
+      setSyncStatus('idle');
+
       const formData = new FormData();
       if (data.file) {
         formData.append("file", data.file);
@@ -103,48 +125,124 @@ const FileUploadForm = ({ folderId }: Props) => {
         formData.append("description", data.description);
       }
 
-      // Add progress tracking
+      // Create a new XMLHttpRequest for better progress tracking
       const xhr = new XMLHttpRequest();
-      xhr.upload.addEventListener("progress", (event) => {
+      
+      // Set up progress tracking
+      xhr.upload.addEventListener("progress", async (event) => {
         if (event.lengthComputable) {
           const percentComplete = (event.loaded / event.total) * 100;
-          setUploadProgress(Math.round(percentComplete));
-          console.log(`Upload progress: ${percentComplete}%`);
+          const roundedProgress = Math.round(percentComplete);
+          setUploadProgress(roundedProgress);
+          
+          // When upload reaches 100%, update statuses
+          if (roundedProgress === 100) {
+            setDriveStatus('uploaded');
+            setLocalStatus('uploaded');
+          }
         }
       });
 
-      const result = await uploadFile(formData);
-      if (result.success) {
-        toast({
-          title: "Success",
-          description: "File uploaded successfully",
-        });
-        // Revalidate the file list
-        await queryClient.invalidateQueries({ queryKey: ["files", folderId] });
-        // Reset form
-        form.reset();
-        setSelectedTags([]);
-        setUploadProgress(0);
-        // Close dialog
-        setIsOpen(false);
-      } else {
-        toast({
-          title: "Error",
-          description: result.error || "Failed to upload file",
-          variant: "destructive",
-        });
-      }
+      // Create a promise to handle the upload
+      const uploadPromise = new Promise<UploadResponse>((resolve, reject) => {
+        xhr.onload = () => {
+          if (xhr.status >= 200 && xhr.status < 300) {
+            try {
+              const response = JSON.parse(xhr.responseText);
+              if (response.success) {
+                setDriveStatus('uploaded');
+                
+                // Start sync only after upload is fully complete
+                if (folderId) {
+                  setSyncStatus('syncing');
+                  console.log('Starting folder sync...');
+                  
+                  fetch(`/api/folder/${folderId}/sync`, {
+                    method: "POST",
+                  })
+                    .then(async syncResponse => {
+                      if (!syncResponse.ok) {
+                        throw new Error("Failed to sync");
+                      }
+                      const syncResult = await syncResponse.json();
+                      console.log('Sync completed:', syncResult);
+                      setSyncStatus('synced');
+                      toast({
+                        title: "Success",
+                        description: "File uploaded and synced",
+                      });
+                      form.reset();
+                      setSelectedTags([]);
+                      setUploadProgress(0);
+                      setIsLoading(false);
+                      setIsOpen(false);
+                      router.refresh();
+                    })
+                    .catch(error => {
+                      console.error('Sync error:', error);
+                      setSyncStatus('failed');
+                      toast({
+                        title: "Error",
+                        description: "Uploaded but sync failed",
+                        variant: "destructive",
+                      });
+                      setIsLoading(false);
+                    });
+                } else {
+                  toast({
+                    title: "Success",
+                    description: "File uploaded",
+                  });
+                  form.reset();
+                  setSelectedTags([]);
+                  setUploadProgress(0);
+                  setIsLoading(false);
+                  setIsOpen(false);
+                  router.refresh();
+                }
+              } else {
+                setDriveStatus('failed');
+                setSyncStatus('failed');
+                toast({
+                  title: "Error",
+                  description: "Upload failed",
+                  variant: "destructive",
+                });
+                setIsLoading(false);
+              }
+              resolve(response);
+            } catch (error) {
+              reject(new Error("Invalid response"));
+            }
+          } else {
+            reject(new Error("Upload failed"));
+          }
+        };
+
+        xhr.onerror = () => {
+          setDriveStatus('failed');
+          setSyncStatus('failed');
+          reject(new Error("Upload failed"));
+        };
+      });
+
+      // Start the upload
+      xhr.open("POST", "/api/upload");
+      xhr.send(formData);
+
+      // Wait for the upload to complete
+      await uploadPromise;
     } catch (error) {
       console.error("Upload error:", error);
-      const errorMessage = error instanceof Error ? error.message : "Failed to upload file";
       toast({
         title: "Error",
-        description: errorMessage,
+        description: "Upload failed",
         variant: "destructive",
       });
-    } finally {
       setIsLoading(false);
       setUploadProgress(0);
+      setDriveStatus('failed');
+      setSyncStatus('failed');
     }
   };
 
@@ -292,6 +390,33 @@ const FileUploadForm = ({ folderId }: Props) => {
                 </FormItem>
               )}
             />
+
+            {isLoading && (
+              <div className="space-y-4">
+                <div className="flex items-center gap-2">
+                  <Cloud className="size-4" />
+                  <span>Uploading to Drive</span>
+                  <span className="ml-auto">
+                    {driveStatus === 'uploading' && <Loader2 className="size-4 animate-spin" />}
+                    {driveStatus === 'uploaded' && <FileCheck className="size-4 text-green-500" />}
+                    {driveStatus === 'failed' && <span className="text-red-500">Failed</span>}
+                  </span>
+                </div>
+                {folderId && (
+                  <div className="flex items-center gap-2">
+                    <RefreshCw className="size-4" />
+                    <span>Syncing</span>
+                    <span className="ml-auto">
+                      {syncStatus === 'syncing' && <Loader2 className="size-4 animate-spin" />}
+                      {syncStatus === 'synced' && <FileCheck className="size-4 text-green-500" />}
+                      {syncStatus === 'failed' && <span className="text-red-500">Failed</span>}
+                    </span>
+                  </div>
+                )}
+                <Progress value={uploadProgress} className="w-full" />
+                <p className="text-xs text-muted-foreground text-center">{uploadProgress}%</p>
+              </div>
+            )}
 
             <Button type="submit" disabled={form.formState.isSubmitting || isLoading}>
               {form.formState.isSubmitting || isLoading ? (

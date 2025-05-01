@@ -7,8 +7,10 @@ export async function POST(
 ): Promise<NextResponse> {
   try {
     const { id } = await params;
+    console.log(`Starting sync for folder ${id}...`);
     const syncService = new SyncService();
     await syncService.syncFolder(id);
+    console.log(`Sync completed for folder ${id}`);
     return NextResponse.json({ success: true });
   } catch (error) {
     console.error("Error in folder sync:", error);

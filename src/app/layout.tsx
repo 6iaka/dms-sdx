@@ -5,6 +5,7 @@ import NextTopLoader from "nextjs-toploader";
 import QueryProvider from "~/components/QueryProvider";
 import DndProvider from "~/components/DndProvider";
 import { Toaster } from "~/components/ui/toaster";
+import { ThemeProvider } from "~/components/ThemeProvider";
 import "~/styles/globals.css";
 
 export const metadata: Metadata = {
@@ -27,16 +28,18 @@ export default async function RootLayout({
     <ClerkProvider>
       <html
         lang="en"
-        className={`${fontSans.variable} --font-karla dark w-screen select-none overflow-x-hidden`}
+        className={`${fontSans.variable} --font-karla w-screen select-none overflow-x-hidden`}
       >
         <body>
-          <QueryProvider>
-            <DndProvider>
-              <NextTopLoader />
-              {children}
-              <Toaster />
-            </DndProvider>
-          </QueryProvider>
+          <ThemeProvider>
+            <QueryProvider>
+              <DndProvider>
+                <NextTopLoader />
+                {children}
+                <Toaster />
+              </DndProvider>
+            </QueryProvider>
+          </ThemeProvider>
         </body>
       </html>
     </ClerkProvider>

@@ -43,6 +43,7 @@ import {
 import {
   DropdownMenuSeparator,
 } from "./ui/dropdown-menu";
+import { Input } from "./ui/input";
 
 type DragItem = {
   id: number;
@@ -465,10 +466,10 @@ export default function FolderCard({ data, onSelect, isSelected, isSelecting }: 
             </DialogDescription>
           </DialogHeader>
           <div className="py-4">
-            <input
+            <Input
               type="text"
               defaultValue={data.title}
-              className="w-full px-3 py-2 border rounded-md"
+              className="w-full"
               onKeyDown={(e) => {
                 if (e.key === "Enter") {
                   void handleRenameClick();

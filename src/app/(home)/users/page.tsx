@@ -13,11 +13,14 @@ import {
   SelectValue,
 } from "~/components/ui/select";
 import { toast } from "sonner";
+import { useTheme } from "~/components/ThemeProvider";
+import { cn } from "~/lib/utils";
 
 export default function UsersPage() {
   const [users, setUsers] = useState<UserWithRole[]>([]);
   const [loading, setLoading] = useState(true);
   const { userId } = useAuth();
+  const { theme } = useTheme();
 
   useEffect(() => {
     // Mark current user as active
@@ -73,44 +76,57 @@ export default function UsersPage() {
 
   return (
     <div className="container mx-auto py-8">
-      <h1 className="text-2xl font-bold mb-6 text-white">User Management</h1>
-      <div className="bg-gray-800 rounded-lg shadow overflow-hidden">
-        <table className="min-w-full divide-y divide-gray-700">
-          <thead className="bg-gray-900">
+      <h1 className="text-2xl font-bold mb-6">User Management</h1>
+      <div className={cn(
+        "rounded-lg shadow overflow-hidden",
+        theme === "dark" ? "bg-gray-800" : "bg-white"
+      )}>
+        <table className="min-w-full divide-y divide-gray-200">
+          <thead className={cn(
+            theme === "dark" ? "bg-gray-900" : "bg-gray-50"
+          )}>
             <tr>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">
+              <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider">
                 Username
               </th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">
+              <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider">
                 Email
               </th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">
+              <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider">
                 Role
               </th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">
+              <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider">
                 Status
               </th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">
+              <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider">
                 Last Active
               </th>
             </tr>
           </thead>
-          <tbody className="bg-gray-800 divide-y divide-gray-700">
+          <tbody className={cn(
+            "divide-y divide-gray-200",
+            theme === "dark" ? "bg-gray-800" : "bg-white"
+          )}>
             {users.map((user) => (
               <tr key={user.id}>
-                <td className="px-6 py-4 whitespace-nowrap text-gray-300">
+                <td className="px-6 py-4 whitespace-nowrap">
                   {user.username || "N/A"}
                 </td>
-                <td className="px-6 py-4 whitespace-nowrap text-gray-300">{user.email}</td>
+                <td className="px-6 py-4 whitespace-nowrap">{user.email}</td>
                 <td className="px-6 py-4 whitespace-nowrap">
                   <Select
                     value={user.role}
                     onValueChange={(value) => handleRoleChange(user.id, value)}
                   >
-                    <SelectTrigger className="w-[180px] bg-gray-700 text-white">
+                    <SelectTrigger className={cn(
+                      "w-[180px]",
+                      theme === "dark" ? "bg-gray-700 text-white" : "bg-white"
+                    )}>
                       <SelectValue placeholder="Select role" />
                     </SelectTrigger>
-                    <SelectContent className="bg-gray-800 text-white">
+                    <SelectContent className={cn(
+                      theme === "dark" ? "bg-gray-800 text-white" : "bg-white"
+                    )}>
                       <SelectItem value="VIEWER">Viewer</SelectItem>
                       <SelectItem value="EDITOR">Editor</SelectItem>
                       <SelectItem value="ADMINISTRATOR">Administrator</SelectItem>
@@ -119,16 +135,21 @@ export default function UsersPage() {
                 </td>
                 <td className="px-6 py-4 whitespace-nowrap">
                   <span
-                    className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${
+                    className={cn(
+                      "px-2 inline-flex text-xs leading-5 font-semibold rounded-full",
                       user.isActive
-                        ? "bg-green-900 text-green-300"
-                        : "bg-gray-700 text-gray-300"
-                    }`}
+                        ? theme === "dark"
+                          ? "bg-green-900 text-green-300"
+                          : "bg-green-100 text-green-800"
+                        : theme === "dark"
+                          ? "bg-gray-700 text-gray-300"
+                          : "bg-gray-100 text-gray-800"
+                    )}
                   >
                     {user.isActive ? "Active" : "Inactive"}
                   </span>
                 </td>
-                <td className="px-6 py-4 whitespace-nowrap text-gray-300">
+                <td className="px-6 py-4 whitespace-nowrap">
                   {user.lastActiveAt ? new Date(user.lastActiveAt).toLocaleString() : "Never"}
                 </td>
               </tr>

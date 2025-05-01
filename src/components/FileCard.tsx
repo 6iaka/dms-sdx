@@ -59,7 +59,7 @@ const FileCard = ({ data, isSelecting, isSelected, onSelect }: Props) => {
     if (!canDelete) return;
     try {
       startTransition(async () => {
-        await deleteFile(data.id);
+      await deleteFile(data.id);
         toast({
           title: "Success",
           description: "File deleted successfully",

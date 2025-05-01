@@ -136,11 +136,21 @@ export class DriveService {
     try {
       if (!file) throw new Error("No file provided");
 
+      console.log("Starting file upload to Google Drive...");
+      console.log("File details:", {
+        name: file.name,
+        size: file.size,
+        type: file.type,
+        folderId,
+        description
+      });
+
       const arrayBuffer = await file.arrayBuffer();
       const buffer = Buffer.from(arrayBuffer);
       const stream = Readable.from(buffer);
 
       // Configure resumable upload for large files
+      console.log("Creating file metadata in Google Drive...");
       const response = await this.drive.files.create({
         requestBody: {
           parents: [folderId],
@@ -159,15 +169,33 @@ export class DriveService {
 
       // Wait for the upload to complete
       await new Promise((resolve, reject) => {
-        stream.on('end', resolve);
-        stream.on('error', reject);
+        let uploadedBytes = 0;
+        const totalBytes = file.size;
+
+        stream.on('data', (chunk) => {
+          uploadedBytes += chunk.length;
+          const progress = (uploadedBytes / totalBytes) * 100;
+          console.log(`Upload progress: ${progress.toFixed(2)}%`);
+        });
+
+        stream.on('end', () => {
+          console.log("Upload completed successfully");
+          resolve(true);
+        });
+
+        stream.on('error', (error) => {
+          console.error("Upload error:", error);
+          reject(error);
+        });
       });
 
+      console.log("Getting file details from Google Drive...");
       const fileData = await this.drive.files.get({
         fileId: response.data.id!,
         fields: "id, name, mimeType, thumbnailLink, webContentLink, webViewLink, iconLink, size, fileExtension, originalFilename",
       });
 
+      console.log("Setting file permissions...");
       await this.drive.permissions.create({
         fileId: fileData.data.id!,
         requestBody: {
@@ -176,9 +204,21 @@ export class DriveService {
         },
       });
 
+      console.log("File upload completed successfully:", {
+        id: fileData.data.id,
+        name: fileData.data.name,
+        size: fileData.data.size
+      });
+
       return fileData.data;
     } catch (error) {
-      console.error(error);
+      console.error("Error in uploadFile:", error);
+      if (error instanceof Error) {
+        console.error("Error details:", {
+          message: error.message,
+          stack: error.stack
+        });
+      }
       throw new Error((error as Error).message);
     }
   };

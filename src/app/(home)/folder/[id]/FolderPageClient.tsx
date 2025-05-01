@@ -108,20 +108,20 @@ const FolderPageClient = ({ data }: { data: FolderWithChildren }) => {
         // Delete selected files in bulk
         if (selectedFiles.length > 0) {
           await deleteFiles(selectedFiles);
-        }
+      }
 
         // Delete selected folders in parallel
         if (selectedFolders.length > 0) {
           await Promise.all(selectedFolders.map(folderId => deleteFolder(folderId)));
-        }
+      }
 
-        toast({
-          title: "Success",
-          description: "Items deleted successfully",
-        });
-        setShowDeleteDialog(false);
-        setSelectedItems([]);
-        setIsSelecting(false);
+      toast({
+        title: "Success",
+        description: "Items deleted successfully",
+      });
+      setShowDeleteDialog(false);
+      setSelectedItems([]);
+      setIsSelecting(false);
         
         // Invalidate queries in parallel
         await Promise.all([
@@ -189,7 +189,7 @@ const FolderPageClient = ({ data }: { data: FolderWithChildren }) => {
         await Promise.all(selectedFolders.map(folderId => 
           moveFolder(folderId, targetFolderId)
         ));
-      }
+        }
       
       toast({
         title: "Success",
@@ -301,9 +301,9 @@ const FolderPageClient = ({ data }: { data: FolderWithChildren }) => {
             className="rounded-full" 
             onClick={() => router.back()}
           >
-            <ChevronLeft />
-            Back
-          </Button>
+                <ChevronLeft />
+                Back
+            </Button>
 
           {!isViewer && (
             <div className="flex flex-wrap items-center gap-2">

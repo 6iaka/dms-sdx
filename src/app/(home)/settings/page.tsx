@@ -10,11 +10,13 @@ import { Label } from "~/components/ui/label";
 import { useState } from "react";
 import { toast } from "sonner";
 import { syncDrive } from "~/server/actions/admin_action";
+import { useTheme } from "~/components/ThemeProvider";
 
 export default function SettingsPage() {
   const { userId } = useAuth();
   const { isAdmin, isEditor } = usePermissions();
   const [isSyncing, setIsSyncing] = useState(false);
+  const { theme, setTheme } = useTheme();
 
   const handleSyncDrive = async () => {
     if (!isAdmin && !isEditor) {
@@ -85,7 +87,10 @@ export default function SettingsPage() {
                   Toggle between light and dark theme
                 </p>
               </div>
-              <Switch />
+              <Switch 
+                checked={theme === "dark"}
+                onCheckedChange={(checked) => setTheme(checked ? "dark" : "light")}
+              />
             </div>
             <Separator />
             <div className="flex items-center justify-between">

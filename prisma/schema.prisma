@@ -34,27 +34,38 @@ model Folder {
   lastSyncTime DateTime?
 }
 
+model User {
+  clerkId    String   @id
+  role       Role     @default(VIEWER)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+  files      File[]
+}
+
 model File {
-  id               Int      @id @default(autoincrement())
-  folderId         Int
-  userClerkId      String
-  categeory        Category
-  googleId         String   @unique
-  title            String
-  mimeType         String
-  description      String?
-  webViewLink      String
-  webContentLink   String
-  thumbnailLink    String?
-  iconLink         String
-  fileSize         Int
-  fileExtension    String
+  id              Int      @id @default(autoincrement())
+  title           String
+  description     String?
+  mimeType        String
+  fileSize        Int
+  fileExtension   String
   originalFilename String
-  trashed          Boolean? @default(false)
-  createdAt        DateTime @default(now())
-  updatedAt        DateTime @updatedAt
-  folder           Folder   @relation(fields: [folderId], references: [id], onDelete: Cascade)
-  tags             Tag[]    @relation("FileToTag")
+  webContentLink  String
+  webViewLink     String
+  thumbnailLink   String?
+  iconLink        String
+  googleId        String   @unique
+  localPath       String?  @unique
+  localFilename   String?  @unique
+  categeory       Category
+  trashed         Boolean? @default(false)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  userClerkId     String
+  folderId        Int
+  folder          Folder   @relation(fields: [folderId], references: [id], onDelete: Cascade)
+  tags            Tag[]    @relation("FileToTag")
+  user            User     @relation(fields: [userClerkId], references: [clerkId])
 }
 
 enum Role {
