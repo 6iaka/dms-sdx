@@ -1,11 +1,8 @@
 import React, { useEffect, useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
-import type { PageInfo, Post } from '../lib/meta-business-suite';
-import { MetaBusinessSuiteService } from '../lib/meta-business-suite';
 import { useAuth } from "@clerk/nextjs";
 import { useTheme } from "~/components/ThemeProvider";
 import { cn } from "~/lib/utils";
-import Image from 'next/image';
 
 interface PageDashboardProps {
   accessToken: string;
@@ -14,47 +11,11 @@ interface PageDashboardProps {
 export function PageDashboard({ accessToken }: PageDashboardProps) {
   const { userId } = useAuth();
   const { theme } = useTheme();
-  const [pages, setPages] = useState<PageInfo[]>([]);
-  const [selectedPage, setSelectedPage] = useState<string | null>(null);
-  const [posts, setPosts] = useState<Post[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(false);
 
   useEffect(() => {
-    const metaService = new MetaBusinessSuiteService(accessToken);
-    
-    const fetchData = async () => {
-      try {
-        const pagesData = (await metaService.getPages()) as unknown as PageInfo[];
-        setPages(pagesData);
-        if (pagesData[0]?.id) {
-          setSelectedPage(pagesData[0].id);
-        }
-      } catch (error) {
-        console.error('Error fetching pages:', error);
-      }
-    };
-
-    void fetchData();
-  }, [accessToken]);
-
-  useEffect(() => {
-    if (selectedPage) {
-      const metaService = new MetaBusinessSuiteService(accessToken);
-      
-      const fetchPosts = async () => {
-        try {
-          const postsData = await metaService.getPagePosts(selectedPage);
-          setPosts(postsData);
-        } catch (error) {
-          console.error('Error fetching posts:', error);
-        } finally {
-          setLoading(false);
-        }
-      };
-
-      void fetchPosts();
-    }
-  }, [selectedPage, accessToken]);
+    setLoading(false);
+  }, []);
 
   if (loading) {
     return <div>Loading...</div>;
@@ -91,76 +52,6 @@ export function PageDashboard({ accessToken }: PageDashboardProps) {
             </p>
           </div>
         </div>
-        <Card>
-          <CardHeader>
-            <CardTitle>Your Pages</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-              {pages.map((page) => (
-                <Card
-                  key={page.id}
-                  className={`cursor-pointer ${
-                    selectedPage === page.id ? 'border-primary' : ''
-                  }`}
-                  onClick={() => setSelectedPage(page.id)}
-                >
-                  <CardHeader>
-                    <CardTitle>{page.name}</CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    <p className="text-sm text-muted-foreground">
-                      Tasks: {page.tasks ? page.tasks.join(', ') : 'No tasks'}
-                    </p>
-                  </CardContent>
-                </Card>
-              ))}
-            </div>
-          </CardContent>
-        </Card>
-
-        {selectedPage && (
-          <Card>
-            <CardHeader>
-              <CardTitle>Recent Posts</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-4">
-                {posts.map((post) => (
-                  <Card key={post.id}>
-                    <CardContent className="pt-6">
-                      {post.message && (
-                        <p className="mb-4">{post.message}</p>
-                      )}
-                      {post.full_picture && (
-                        <Image
-                          src={post.full_picture}
-                          alt="Post"
-                          width={500}
-                          height={300}
-                          className="rounded-lg mb-4"
-                        />
-                      )}
-                      <div className="flex justify-between items-center text-sm text-muted-foreground">
-                        <span>
-                          Posted on: {new Date(post.created_time).toLocaleDateString()}
-                        </span>
-                        <a
-                          href={post.permalink_url}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="text-primary hover:underline"
-                        >
-                          View on Facebook
-                        </a>
-                      </div>
-                    </CardContent>
-                  </Card>
-                ))}
-              </div>
-            </CardContent>
-          </Card>
-        )}
       </div>
     </div>
   );
