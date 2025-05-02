@@ -2,6 +2,8 @@
 
 import { type drive_v3, google } from "googleapis";
 import { env } from "~/env";
+import { FolderService } from "../server/services/folder_service";
+import { PrismaClient } from "@prisma/client";
 
 const auth = new google.auth.GoogleAuth({
     credentials: {
@@ -17,6 +19,8 @@ const auth = new google.auth.GoogleAuth({
   });
 
   const drive = google.drive({ version: "v3", auth });
+
+const prisma = new PrismaClient();
 
 export const getAllItems = async () => {
   try {
@@ -174,3 +178,54 @@ export const moveAllItems = async (targetFolderId: string) => {
     throw error;
   }
 };
+
+async function cleanup() {
+  try {
+    // Get all root folders
+    const rootFolders = await prisma.folder.findMany({
+      where: { isRoot: true },
+      orderBy: { createdAt: 'asc' }
+    });
+
+    if (rootFolders.length <= 1) {
+      console.log("No duplicate root folders found");
+      return;
+    }
+
+    // Keep the oldest root folder and move all items from other root folders to it
+    const mainRootFolder = rootFolders[0];
+    if (!mainRootFolder) {
+      throw new Error("No root folder found");
+    }
+
+    const duplicateRoots = rootFolders.slice(1);
+
+    for (const duplicateRoot of duplicateRoots) {
+      // Move all files from duplicate root to main root
+      await prisma.file.updateMany({
+        where: { folderId: duplicateRoot.id },
+        data: { folderId: mainRootFolder.id }
+      });
+
+      // Move all subfolders from duplicate root to main root
+      await prisma.folder.updateMany({
+        where: { parentId: duplicateRoot.id },
+        data: { parentId: mainRootFolder.id }
+      });
+
+      // Delete the duplicate root folder
+      await prisma.folder.delete({
+        where: { id: duplicateRoot.id }
+      });
+    }
+
+    console.log(`Cleaned up ${duplicateRoots.length} duplicate root folders`);
+  } catch (error) {
+    console.error("Error during cleanup:", error);
+    process.exit(1);
+  } finally {
+    await prisma.$disconnect();
+  }
+}
+
+cleanup();

@@ -248,6 +248,52 @@ export class FolderService {
       }
     });
   }
+
+  cleanupDuplicateRoots = async () => {
+    try {
+      // Get all root folders
+      const rootFolders = await prisma.folder.findMany({
+        where: { isRoot: true },
+        orderBy: { createdAt: 'asc' }
+      });
+
+      if (rootFolders.length <= 1) {
+        return; // No duplicates to clean up
+      }
+
+      // Keep the oldest root folder and move all items from other root folders to it
+      const mainRootFolder = rootFolders[0];
+      if (!mainRootFolder) {
+        throw new Error("No root folder found");
+      }
+
+      const duplicateRoots = rootFolders.slice(1);
+
+      for (const duplicateRoot of duplicateRoots) {
+        // Move all files from duplicate root to main root
+        await prisma.file.updateMany({
+          where: { folderId: duplicateRoot.id },
+          data: { folderId: mainRootFolder.id }
+        });
+
+        // Move all subfolders from duplicate root to main root
+        await prisma.folder.updateMany({
+          where: { parentId: duplicateRoot.id },
+          data: { parentId: mainRootFolder.id }
+        });
+
+        // Delete the duplicate root folder
+        await prisma.folder.delete({
+          where: { id: duplicateRoot.id }
+        });
+      }
+
+      console.log(`Cleaned up ${duplicateRoots.length} duplicate root folders`);
+    } catch (error) {
+      console.error("Error cleaning up duplicate root folders:", error);
+      throw error;
+    }
+  };
 }
 
 const folderService = new FolderService();

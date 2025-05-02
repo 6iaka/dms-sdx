@@ -2,6 +2,7 @@
 import { type drive_v3, google } from "googleapis";
 import { Readable } from "stream";
 import { env } from "~/env";
+import { prisma } from "../db";
 
 export class DriveService {
   private auth = new google.auth.GoogleAuth({
@@ -257,25 +258,49 @@ export class DriveService {
    */
   getRootFolder = async () => {
     try {
-      const response = await this.drive.files.list({
-        q: "mimeType = 'application/vnd.google-apps.folder' and 'root' in parents",
-        fields: "files(id, name, mimeType, parents)",
+      // First check if we already have a root folder in our database
+      const existingRoot = await prisma.folder.findFirst({
+        where: { isRoot: true }
       });
 
-      const folders = response.data.files;
-      if (!folders || !Array.isArray(folders)) {
-        throw new Error("Failed to get root folder: Invalid response format");
+      if (existingRoot) {
+        // If we have a root folder in our database, try to get it from Google Drive
+        try {
+          const response = await this.drive.files.get({
+            fileId: existingRoot.googleId,
+            fields: "id, name, mimeType, parents",
+          });
+          return response.data;
+        } catch (error) {
+          console.error("Error getting existing root folder:", error);
+          // If we can't get it from Google Drive, we'll create a new one
+        }
       }
 
-      const rootFolder = folders.find(
-        (folder) => !folder.parents || !Array.isArray(folder.parents) || folder.parents.length === 0
-      );
-
-      if (!rootFolder) {
-        throw new Error("Root folder not found");
+      // If we don't have a root folder or can't get it, create a new one
+      console.log("Creating new root folder...");
+      const newRootFolder = await this.drive.files.create({
+        requestBody: {
+          name: "Root",
+          mimeType: "application/vnd.google-apps.folder",
+          description: "Main folder of the project",
+        },
+      });
+      
+      if (!newRootFolder.data.id) {
+        throw new Error("Failed to create root folder");
       }
-
-      return rootFolder;
+      
+      // If we had an existing root folder in our database but couldn't get it from Google Drive,
+      // update our database to point to the new root folder
+      if (existingRoot) {
+        await prisma.folder.update({
+          where: { id: existingRoot.id },
+          data: { googleId: newRootFolder.data.id }
+        });
+      }
+      
+      return newRootFolder.data;
     } catch (error) {
       console.error("Error getting root folder:", error);
       throw new Error((error as Error).message);

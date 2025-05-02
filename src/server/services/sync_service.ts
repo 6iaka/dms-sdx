@@ -20,10 +20,33 @@ export class SyncService {
         throw new Error("Folder not found in database");
       }
 
-      // Get the root folder
-      const rootFolder = await this.folderService.findRoot();
+      // First, check if this folder is already marked as root
+      if (folder.isRoot) {
+        console.log("This folder is already marked as root, skipping root folder creation");
+        return;
+      }
+
+      // Get or create the root folder
+      let rootFolder = await this.folderService.findRoot();
       if (!rootFolder) {
-        throw new Error("Root folder not found");
+        // If no root folder exists, create one
+        const driveRoot = await this.driveService.getRootFolder();
+        if (!driveRoot.id) {
+          throw new Error("Failed to get or create root folder");
+        }
+        
+        // Create the root folder in our database
+        rootFolder = await this.folderService.upsert({
+          googleId: driveRoot.id,
+          title: "Root",
+          userClerkId: folder.userClerkId,
+          description: "Main folder of the project",
+          isRoot: true,
+        });
+      }
+
+      if (!rootFolder) {
+        throw new Error("Failed to get or create root folder");
       }
 
       // Get all items in the folder and its subfolders
