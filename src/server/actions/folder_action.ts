@@ -5,7 +5,6 @@ import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import driveService from "../services/drive_service";
 import folderService from "../services/folder_service";
-import FolderService from "../services/folder_service";
 import fileService from "../services/file_service";
 
 export const getAllFolders = async () => {

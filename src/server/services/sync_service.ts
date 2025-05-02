@@ -2,7 +2,6 @@
 import { DriveService } from "./drive_service";
 import { FolderService } from "./folder_service";
 import { FileService } from "./file_service";
-import { prisma } from "../db";
 
 export class SyncService {
   private driveService = new DriveService();
@@ -175,6 +174,12 @@ export class SyncService {
     }
   };
 
+  private getFileCategory(mimeType: string) {
+    if (mimeType.startsWith("image/")) return "IMAGE";
+    if (mimeType.startsWith("video/")) return "VIDEO";
+    return "DOCUMENT";
+  }
+
   /**
    * Sync only items within a specific folder (non-recursive)
    */
@@ -311,10 +316,4 @@ export class SyncService {
       throw error;
     }
   };
-
-  private getFileCategory(mimeType: string) {
-    if (mimeType.startsWith("image/")) return "IMAGE";
-    if (mimeType.startsWith("video/")) return "VIDEO";
-    return "DOCUMENT";
-  }
-} 
+}

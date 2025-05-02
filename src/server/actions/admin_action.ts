@@ -170,7 +170,7 @@ export const syncDrive = async () => {
       const batch = fileItems.slice(i, i + batchSize);
       console.log(`Processing batch ${i/batchSize + 1} of ${Math.ceil(fileItems.length/batchSize)}`);
       
-      const results = await Promise.allSettled(
+      await Promise.all(
         batch.map((item) =>
           limit(async () => {
             try {

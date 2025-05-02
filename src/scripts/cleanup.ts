@@ -2,7 +2,6 @@
 
 import { type drive_v3, google } from "googleapis";
 import { env } from "~/env";
-import { FolderService } from "../server/services/folder_service";
 import { PrismaClient } from "@prisma/client";
 
 const auth = new google.auth.GoogleAuth({
@@ -50,7 +49,7 @@ export const getAllItems = async () => {
   }
 };
 
-export const moveAllItems = async (targetFolderId: string) => {
+export const moveAllItems = async (_targetFolderId: string) => {
   try {
     console.log("Starting thorough file analysis...");
     // Get all files including those in shared drives
@@ -220,12 +219,12 @@ async function cleanup() {
     }
 
     console.log(`Cleaned up ${duplicateRoots.length} duplicate root folders`);
-  } catch (error) {
-    console.error("Error during cleanup:", error);
+  } catch (err) {
+    console.error("Error during cleanup:", err);
     process.exit(1);
   } finally {
     await prisma.$disconnect();
   }
 }
 
-cleanup();
+void cleanup();
