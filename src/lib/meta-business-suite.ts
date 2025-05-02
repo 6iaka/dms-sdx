@@ -15,7 +15,7 @@ export interface PageInfo {
   id: string;
   name: string;
   access_token: string;
-  tasks: string[];
+  tasks?: string[];
 }
 
 export interface Post {
@@ -24,6 +24,23 @@ export interface Post {
   created_time: string;
   full_picture?: string;
   permalink_url: string;
+}
+
+interface FacebookApiResponse<T> {
+  data: T[];
+}
+
+interface MetricValue {
+  value: number;
+}
+
+interface MetricData {
+  name: string;
+  values: MetricValue[];
+}
+
+interface InsightsResponse {
+  data: MetricData[];
 }
 
 export class MetaBusinessSuiteService {
@@ -37,13 +54,13 @@ export class MetaBusinessSuiteService {
   // Get list of pages the user has access to
   async getPages(): Promise<PageInfo[]> {
     try {
-      const response = await axios.get(`${this.baseUrl}/me/accounts`, {
+      const response = await axios.get<FacebookApiResponse<PageInfo>>(`${this.baseUrl}/me/accounts`, {
         params: {
           access_token: this.accessToken,
           fields: 'id,name,access_token,tasks',
         },
       });
-      return response.data.data || [];
+      return response.data.data;
     } catch (error) {
       console.error('Error fetching pages:', error);
       return [];
@@ -51,9 +68,9 @@ export class MetaBusinessSuiteService {
   }
 
   // Get posts from a specific page
-  async getPagePosts(pageId: string, limit: number = 10): Promise<Post[]> {
+  async getPagePosts(pageId: string, limit = 10): Promise<Post[]> {
     try {
-      const response = await axios.get(`${this.baseUrl}/${pageId}/posts`, {
+      const response = await axios.get<FacebookApiResponse<Post>>(`${this.baseUrl}/${pageId}/posts`, {
         params: {
           access_token: this.accessToken,
           fields: 'id,message,created_time,full_picture,permalink_url',
@@ -70,24 +87,26 @@ export class MetaBusinessSuiteService {
   // Get detailed post statistics
   async getPostStats(postId: string): Promise<PostStats> {
     try {
-      const response = await axios.get(`${this.baseUrl}/${postId}/insights`, {
+      const response = await axios.get<InsightsResponse>(`${this.baseUrl}/${postId}/insights`, {
         params: {
           access_token: this.accessToken,
           metric: 'post_impressions,post_reach,post_engaged_users,post_reactions_by_type,post_comments,post_shares,post_clicks',
         },
       });
 
-      const metrics = response.data.data.reduce((acc: any, metric: any) => {
-        acc[metric.name] = metric.values[0].value;
+      const metrics = response.data.data.reduce<Record<string, number>>((acc, metric) => {
+        if (metric.values[0]) {
+          acc[metric.name] = metric.values[0].value;
+        }
         return acc;
-      }, {});
+      }, {} as Record<string, number>);
 
       return {
         id: postId,
         reach: metrics.post_reach || 0,
         impressions: metrics.post_impressions || 0,
         engagement: metrics.post_engaged_users || 0,
-        reactions: metrics.post_reactions_by_type?.total || 0,
+        reactions: metrics.post_reactions_by_type || 0,
         comments: metrics.post_comments || 0,
         shares: metrics.post_shares || 0,
         clicks: metrics.post_clicks || 0,
@@ -107,7 +126,7 @@ export class MetaBusinessSuiteService {
   // Create a new post on a page
   async createPost(pageId: string, message: string): Promise<Post> {
     try {
-      const response = await axios.post(`${this.baseUrl}/${pageId}/feed`, {
+      const response = await axios.post<Post>(`${this.baseUrl}/${pageId}/feed`, {
         message,
         access_token: this.accessToken,
       });
@@ -119,9 +138,9 @@ export class MetaBusinessSuiteService {
   }
 
   // Get page insights
-  async getPageInsights(pageId: string, metric: string, period: 'day' | 'week' | 'month' = 'day'): Promise<any> {
+  async getPageInsights(pageId: string, metric: string, period: 'day' | 'week' | 'month' = 'day'): Promise<MetricData[]> {
     try {
-      const response = await axios.get(`${this.baseUrl}/${pageId}/insights`, {
+      const response = await axios.get<InsightsResponse>(`${this.baseUrl}/${pageId}/insights`, {
         params: {
           access_token: this.accessToken,
           metric,

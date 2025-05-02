@@ -44,6 +44,18 @@ const formSchema = z.object({
 
 type Props = { folderId?: number };
 
+interface UploadResponse {
+  success: boolean;
+  error?: string;
+  data?: {
+    id: string;
+    name: string;
+    mimeType: string;
+    size: string;
+    webViewLink: string;
+  };
+}
+
 const FileUploadForm = ({ folderId }: Props) => {
   const { toast } = useToast();
   const [isOpen, setIsOpen] = useState(false);
@@ -107,28 +119,12 @@ const FileUploadForm = ({ folderId }: Props) => {
       const xhr = new XMLHttpRequest();
       
       // Set up progress tracking
-      xhr.upload.addEventListener("progress", async (event) => {
+      xhr.upload.addEventListener("progress", (event) => {
         if (event.lengthComputable) {
           const percentComplete = (event.loaded / event.total) * 100;
           const roundedProgress = Math.round(percentComplete);
           setUploadProgress(roundedProgress);
           console.log(`Upload progress: ${percentComplete}%`);
-
-          // When upload reaches 100%, trigger a folder sync
-          if (roundedProgress === 100) {
-            try {
-              console.log("Upload complete, syncing folder...");
-              // First invalidate the files query to trigger a refresh
-              await queryClient.invalidateQueries({ queryKey: ["files", folderId] });
-              
-              // Then force a refetch to ensure we have the latest data
-              await queryClient.refetchQueries({ queryKey: ["files", folderId] });
-              
-              console.log("Folder sync completed");
-            } catch (error) {
-              console.error("Error syncing folder:", error);
-            }
-          }
         }
       });
 
@@ -156,11 +152,11 @@ const FileUploadForm = ({ folderId }: Props) => {
       };
 
       // Create a promise to handle the upload
-      const uploadPromise = new Promise<{ success: boolean; error?: string; data?: any }>((resolve, reject) => {
+      const uploadPromise = new Promise<UploadResponse>((resolve, reject) => {
         xhr.onload = () => {
           if (xhr.status >= 200 && xhr.status < 300) {
             try {
-              const response = JSON.parse(xhr.responseText);
+              const response = JSON.parse(xhr.responseText) as UploadResponse;
               resolve(response);
             } catch (error) {
               reject(new Error("Invalid response from server"));

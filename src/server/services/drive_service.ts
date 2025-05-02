@@ -174,7 +174,7 @@ export class DriveService {
         let uploadedBytes = 0;
         const totalBytes = file.size;
 
-        stream.on('data', (chunk) => {
+        stream.on('data', (chunk: Buffer) => {
           uploadedBytes += chunk.length;
           const progress = (uploadedBytes / totalBytes) * 100;
           console.log(`Upload progress: ${progress.toFixed(2)}%`);
@@ -258,19 +258,26 @@ export class DriveService {
   getRootFolder = async () => {
     try {
       const response = await this.drive.files.list({
-        q: "mimeType = 'application/vnd.google-apps.folder'",
-        fields: "*",
+        q: "mimeType = 'application/vnd.google-apps.folder' and 'root' in parents",
+        fields: "files(id, name, mimeType, parents)",
       });
 
-      const folders = response.data.files ?? [];
+      const folders = response.data.files;
+      if (!folders || !Array.isArray(folders)) {
+        throw new Error("Failed to get root folder: Invalid response format");
+      }
+
       const rootFolder = folders.find(
-        (folder) => !folder.parents || folder.parents.length === 0,
+        (folder) => !folder.parents || !Array.isArray(folder.parents) || folder.parents.length === 0
       );
-      if (!rootFolder) throw new Error("Root folder not found");
+
+      if (!rootFolder) {
+        throw new Error("Root folder not found");
+      }
 
       return rootFolder;
     } catch (error) {
-      console.error(error);
+      console.error("Error getting root folder:", error);
       throw new Error((error as Error).message);
     }
   };
@@ -492,6 +499,25 @@ export class DriveService {
       throw new Error((error as Error).message);
     }
   };
+
+  // Add proper type checking for the length property
+  private async getFileSize(fileId: string): Promise<number> {
+    try {
+      const file = await this.drive.files.get({
+        fileId,
+        fields: 'size',
+      });
+
+      if (!file.data || typeof file.data.size !== 'string') {
+        return 0;
+      }
+
+      return parseInt(file.data.size, 10);
+    } catch (error) {
+      console.error('Error getting file size:', error);
+      return 0;
+    }
+  }
 }
 
 const driveService = new DriveService();
