@@ -68,10 +68,47 @@ export const syncDrive = async () => {
             
             // Get all contents of the target folder
             const targetContents = await driveService.fetchFiles(targetFolder.id!);
-            items.push(...targetContents.map(content => ({
-              ...content,
-              parents: [targetFolder.id!] // Set parent to the target folder
-            })));
+            
+            // Process each item in the target folder
+            for (const content of targetContents) {
+              // Maintain the original parent relationship
+              const parentId = content.parents?.[0] || targetFolder.id!;
+              
+              if (content.mimeType === "application/vnd.google-apps.folder") {
+                // Handle folder
+                await folderService.upsert({
+                  googleId: content.id!,
+                  title: content.name!,
+                  userClerkId: user.id,
+                  description: content.description || undefined,
+                  parent: { connect: { googleId: parentId } },
+                  isRoot: false,
+                  isShortcut: false,
+                  lastSyncTime: new Date(),
+                });
+              } else {
+                // Handle file
+                const category = getCategoryFromMimeType(content.mimeType!);
+                if (!category) continue; // Skip files with unrecognized mime types
+
+                await fileService.upsert({
+                  googleId: content.id!,
+                  title: content.name!,
+                  userClerkId: user.id,
+                  folder: { connect: { googleId: parentId } },
+                  categeory: category,
+                  mimeType: content.mimeType!,
+                  description: content.description || undefined,
+                  webViewLink: content.webViewLink!,
+                  webContentLink: content.webContentLink!,
+                  thumbnailLink: content.thumbnailLink || undefined,
+                  iconLink: content.iconLink!,
+                  fileSize: parseInt(content.size || "0"),
+                  fileExtension: content.fileExtension || "",
+                  originalFilename: content.originalFilename || content.name!,
+                });
+              }
+            }
           }
         } catch (error) {
           console.error(`Error processing shortcut ${shortcut.name}:`, error);
@@ -170,7 +207,7 @@ export const syncDrive = async () => {
       const batch = fileItems.slice(i, i + batchSize);
       console.log(`Processing batch ${i/batchSize + 1} of ${Math.ceil(fileItems.length/batchSize)}`);
       
-      await Promise.all(
+      const results = await Promise.allSettled(
         batch.map((item) =>
           limit(async () => {
             try {
@@ -312,8 +349,16 @@ export const quickSync = async () => {
 
     console.log(`Found ${items.length} new items to sync`);
 
+    // Filter out hidden files and folders
+    const visibleItems = items.filter(item => 
+      !item.name?.startsWith('.') && // Unix hidden files
+      !item.name?.startsWith('~$') && // Temporary files
+      !item.trashed && // Not in trash
+      item.owners?.[0]?.me // Only files owned by the user
+    );
+
     // Process shortcuts first
-    const shortcuts = items.filter(item => item.mimeType === "application/vnd.google-apps.shortcut");
+    const shortcuts = visibleItems.filter(item => item.mimeType === "application/vnd.google-apps.shortcut");
     console.log(`Found ${shortcuts.length} shortcuts to process`);
 
     // Track shortcut target folders to prevent them from becoming root folders
@@ -324,17 +369,69 @@ export const quickSync = async () => {
         try {
           const targetFolder = await driveService.getFile(shortcut.shortcutDetails.targetId);
           if (targetFolder && targetFolder.mimeType === "application/vnd.google-apps.folder") {
-            shortcutTargetIds.add(targetFolder.id!);
-            items.push({
-              ...targetFolder,
-              parents: shortcut.parents
-            });
-            
-            const targetContents = await driveService.fetchFiles(targetFolder.id!);
-            items.push(...targetContents.map(content => ({
-              ...content,
-              parents: [targetFolder.id!]
-            })));
+            // Only process the shortcut target if it was modified after last sync
+            if (targetFolder.modifiedTime && new Date(targetFolder.modifiedTime) > lastSyncTime) {
+              // Mark this folder as a shortcut target
+              shortcutTargetIds.add(targetFolder.id!);
+              
+              // Add the shortcut target folder to our items list with the correct parent
+              visibleItems.push({
+                ...targetFolder,
+                parents: shortcut.parents // Maintain the original parent relationship
+              });
+              
+              // Only fetch contents that were modified after last sync
+              const targetContents = await driveService.fetchFiles(targetFolder.id!);
+              const modifiedContents = targetContents.filter(content => 
+                content.modifiedTime && 
+                new Date(content.modifiedTime) > lastSyncTime &&
+                !content.name?.startsWith('.') && // Unix hidden files
+                !content.name?.startsWith('~$') && // Temporary files
+                !content.trashed && // Not in trash
+                content.owners?.[0]?.me // Only files owned by the user
+              );
+              
+              // Process each item in the target folder
+              for (const content of modifiedContents) {
+                // Maintain the original parent relationship
+                const parentId = content.parents?.[0] || targetFolder.id!;
+                
+                if (content.mimeType === "application/vnd.google-apps.folder") {
+                  // Handle folder
+                  await folderService.upsert({
+                    googleId: content.id!,
+                    title: content.name!,
+                    userClerkId: user.id,
+                    description: content.description || undefined,
+                    parent: { connect: { googleId: parentId } },
+                    isRoot: false, // Never set as root
+                    isShortcut: false,
+                    lastSyncTime: new Date(),
+                  });
+                } else {
+                  // Handle file
+                  const category = getCategoryFromMimeType(content.mimeType!);
+                  if (!category) continue; // Skip files with unrecognized mime types
+
+                  await fileService.upsert({
+                    googleId: content.id!,
+                    title: content.name!,
+                    userClerkId: user.id,
+                    folder: { connect: { googleId: parentId } },
+                    categeory: category,
+                    mimeType: content.mimeType!,
+                    description: content.description || undefined,
+                    webViewLink: content.webViewLink!,
+                    webContentLink: content.webContentLink!,
+                    thumbnailLink: content.thumbnailLink || undefined,
+                    iconLink: content.iconLink!,
+                    fileSize: parseInt(content.size || "0"),
+                    fileExtension: content.fileExtension || "",
+                    originalFilename: content.originalFilename || content.name!,
+                  });
+                }
+              }
+            }
           }
         } catch (error) {
           console.error(`Error processing shortcut ${shortcut.name}:`, error);
@@ -343,12 +440,12 @@ export const quickSync = async () => {
     }
 
     // Process folders
-    const folderItems = items.filter(
+    const folderItems = visibleItems.filter(
       (item) => item.mimeType === "application/vnd.google-apps.folder"
     );
     
     // Process files
-    const fileItems = items.filter(
+    const fileItems = visibleItems.filter(
       (item) => item.mimeType !== "application/vnd.google-apps.folder" && 
                item.mimeType !== "application/vnd.google-apps.shortcut"
     );
@@ -356,13 +453,15 @@ export const quickSync = async () => {
     // Sync folders
     for (const folder of folderItems) {
       try {
+        const parentId = folder.parents?.[0];
         await folderService.upsert({
           googleId: folder.id!,
           title: folder.name!,
           description: folder.description,
           userClerkId: user.id,
-          isRoot: !shortcutTargetIds.has(folder.id!) && (!folder.parents || folder.parents.length === 0),
-          lastSyncTime: new Date() // Update last sync time
+          parent: parentId ? { connect: { googleId: parentId } } : undefined,
+          isRoot: false, // Never set as root in quick sync
+          lastSyncTime: new Date()
         });
       } catch (error) {
         console.error(`Error syncing folder ${folder.name}:`, error);
@@ -409,7 +508,7 @@ export const quickSync = async () => {
     revalidatePath("/folder/:id", "page");
     return { 
       success: true, 
-      message: `Quick sync completed. ${items.length} items processed.` 
+      message: `Quick sync completed. ${visibleItems.length} items processed.` 
     };
   } catch (error) {
     console.error("Error in quickSync:", error);
